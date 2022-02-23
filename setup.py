@@ -2,21 +2,18 @@
 from setuptools import setup, find_namespace_packages
 import pathlib
 
-
 APP_NAME = "ecoevocrm"
 VERSION = "1.0.0"
 LICENSE = "MIT"
 AUTHOR = "Ryan Seamus McGee"
-DESCRIPTION = "Modeling frameworks for extended consumer resource models of eco-evoutionary community dynamics."
-URL = "https://github.com/ryansmcgee/ecoevocrm.git"
-
+DESCRIPTION = "Computational frameworks for extended consumer resource models of eco-evoutionary community dynamics."
+URL = "https://github.com/tikhonov-group/ecoevocrm.git"
 
 # Directory containing this file
 HERE = pathlib.Path(__file__).parent
 
 # Text of README file
 README = (HERE / "README.md").read_text()
-
 
 setup(
     name=APP_NAME,
