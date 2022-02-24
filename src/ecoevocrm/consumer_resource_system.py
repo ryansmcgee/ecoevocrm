@@ -80,12 +80,12 @@ class ConsumerResourceSystem():
         # Initialize type set parameters:
         #----------------------------------
         if(type_set is not None):
-            if(isinstance(type_set, StrainPool)):
+            if(isinstance(type_set, TypeSet)):
                 self.type_set = type_set
             else:
-                utils.error(f"Error in ConsumerResourceSystem __init__(): type_set argument expects object of StrainPool type.")
+                utils.error(f"Error in ConsumerResourceSystem __init__(): type_set argument expects object of TypeSet type.")
         else:
-            self.type_set = StrainPool(num_types=system_num_types, num_traits=system_num_resources, sigma=sigma, b=b, k=k, eta=eta, l=l, g=g, c=c, chi=chi, mu=mu)
+            self.type_set = TypeSet(num_types=system_num_types, num_traits=system_num_resources, sigma=sigma, b=b, k=k, eta=eta, l=l, g=g, c=c, chi=chi, mu=mu)
         # Check that the type set dimensions match the system dimensions:
         if(system_num_types != self.type_set.num_types): 
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system types ({system_num_types}) does not match number of type set types ({self.type_set.num_types}).")
@@ -453,7 +453,7 @@ class ConsumerResourceSystem():
 
     def get_type_abundance(self, type_index=None, type_id=None, t=None, t_index=None):
         type_indices = [ np.where(self.type_set.type_ids == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [ np.where(self.t_series == t_)[0] for t_ in utils.treat_as_list(t) if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1 ]
+        time_indices = [ np.where(self.t_series == t_)[0] for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1 
         #----------------------------------
         abundances = self.N_series[type_indices, time_indices]
         return abundances if len(type_indices) > 1 else abundances[0]
