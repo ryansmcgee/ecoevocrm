@@ -43,7 +43,7 @@ class TypeSet():
         self.eta   = utils.reshape(eta,   shape=(self.num_types, self.num_traits))
         self.l     = utils.reshape(l,     shape=(self.num_types, self.num_traits))
         self.g     = utils.reshape(g,     shape=(self.num_types, 1)).ravel()
-        self.c     = utils.reshape(c,     shape=(self.num_types, 1))
+        self.c     = utils.reshape(c,     shape=(self.num_types, 1)).ravel()
         self.chi   = utils.reshape(chi,   shape=(self.num_types, self.num_traits)) if chi is not None else None
         self.mu    = utils.reshape(mu,    shape=(self.num_types, 1)).ravel()
 
@@ -73,9 +73,9 @@ class TypeSet():
         #----------------------------------
         costs = 0 + c
         if(chi is not None):
-            costs += np.sum(np.multiply(sigma, chi), axis=1, keepdims=True)
+            costs += np.sum(np.multiply(sigma, chi), axis=1)
         if(J is not None):
-            costs += -1 * np.sum(np.multiply(sigma, np.dot(sigma, J)), axis=1, keepdims=True)
+            costs += -1 * np.sum(np.multiply(sigma, np.dot(sigma, J)), axis=1)
         #----------------------------------
         self.energy_costs = costs.ravel()
         return self.energy_costs
@@ -203,6 +203,24 @@ class TypeSet():
 
     def get_type_id(self, index):
         return hash(tuple( self.sigma[index].tolist() + self.b[index].tolist() + self.k[index].tolist() + self.eta[index].tolist()
-                           + self.l[index].tolist() + [self.g[index]] + self.c[index].tolist() + self.chi[index].tolist() + [self.mu[index]] ))
+                           + self.l[index].tolist() + [self.g[index]] + [self.g[index]] + self.chi[index].tolist() + [self.mu[index]] ))
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_params(self, index=None, type_id=None):
+        # TODO: make possible to get multiple types by list of indices or ids
+        type_idx = np.where(self.type_ids==type_id)[0] if type_id is not None else index
+        if(type_idx is not None):
+            return (self.sigma[type_idx], self.b[type_idx], self.k[type_idx], self.eta[type_idx], self.g[type_idx], self.l[type_idx], self.c[type_idx], self.chi[type_idx], self.mu[type_idx], self.energy_costs[type_idx])
+        if(type_idx is None):
+            return (self.sigma[:], self.b[:], self.k[:], self.eta[:], self.g[:], self.l[:], self.c[:], self.chi[:], self.mu[:], self.energy_costs[:])
+
+
+
+
+
+
+
 
 

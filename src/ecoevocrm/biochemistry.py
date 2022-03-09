@@ -23,3 +23,9 @@ class Biochemistry():
         self.J = utils.reshape(J, shape=(self.num_resources, self.num_resources)) if J is not None else None
         self.D = utils.reshape(D, shape=(self.num_resources, self.num_resources)) if D is not None else None
 
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_params(self):
+        return (self.J, self.D)
+
