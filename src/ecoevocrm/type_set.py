@@ -17,9 +17,11 @@ class TypeSet():
                        g             = 1,
                        c             = 0,
                        chi           = None,
+                       J             = None,
                        mu            = 0,
                        lineage_ids   = None,
-                       has_phylogeny = True ):
+                       has_phylogeny = True,
+                       is_mutant_set = False ):
 
         # Determine the number of types and traits:
         if(isinstance(sigma, (list, np.ndarray))):
@@ -45,6 +47,7 @@ class TypeSet():
         self.g     = utils.reshape(g,     shape=(self.num_types, 1)).ravel()
         self.c     = utils.reshape(c,     shape=(self.num_types, 1)).ravel()
         self.chi   = utils.reshape(chi,   shape=(self.num_types, self.num_traits)) if chi is not None else None
+        self.J     = utils.reshape(J,     shape=(self.num_traits, self.num_traits)) if J is not None else None
         self.mu    = utils.reshape(mu,    shape=(self.num_types, 1)).ravel()
 
         # Calculate initial (biochem independent) phenotypic costs:
@@ -53,7 +56,6 @@ class TypeSet():
         # Assign unique ids to each type (determined by hash of all param values):
         self.type_ids = np.array([self.get_type_id(i) for i in range(self.num_types)])
 
-        
         self.lineage_ids    = np.array([None for i in range(self.num_types)] if lineage_ids is None else lineage_ids)
         self.parent_indices = np.array([None for i in range(self.num_types)])
         self.phylogeny      = {}
@@ -61,15 +63,20 @@ class TypeSet():
             for i in range(self.num_types):
                 new_lineage_id = self.add_type_to_phylogeny(i)
                 self.lineage_ids[i] = new_lineage_id
+
+        print("typeset here")
+        if(not is_mutant_set):
+            self.mutant_set = self.generate_mutant_set()
+        print("typeset here2")
                 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def update_phenotypic_costs(self, sigma=None, c=None, chi=None, biochemistry=None):
+    def update_phenotypic_costs(self, sigma=None, c=None, chi=None, J=None):
         sigma = self.sigma if sigma is None else sigma
         c     = self.c if c is None else c
         chi   = self.chi if chi is None else chi
-        J     = biochemistry.J if biochemistry is not None else None
+        J     = self.J if J is None else J
         #----------------------------------
         costs = 0 + c
         if(chi is not None):
@@ -94,8 +101,9 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def generate_mutant_set(self, sigma=None, biochemistry=None, has_phylogeny=False):
+    def generate_mutant_set(self, sigma=None, J=None, has_phylogeny=False):
         sigma = self.sigma if sigma is None else sigma
+        J     = self.J if J is None else J
         #----------------------------------
         sigma_mut = self.generate_mutant_phenotypes()
         b_mut     = np.repeat(self.b, repeats=sigma.shape[1], axis=0)
@@ -107,8 +115,8 @@ class TypeSet():
         chi_mut   = np.repeat(self.chi, repeats=sigma.shape[1], axis=0)
         mu_mut    = np.repeat(self.mu, repeats=sigma.shape[1], axis=0)
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, c=c_mut, chi=chi_mut, mu=mu_mut, has_phylogeny=has_phylogeny)
-        mutant_set.update_phenotypic_costs(biochemistry=biochemistry)
+        mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, c=c_mut, chi=chi_mut, J=J, mu=mu_mut, has_phylogeny=has_phylogeny, is_mutant_set=True)
+        mutant_set.update_phenotypic_costs()
         #----------------------------------
         return mutant_set
 
@@ -160,6 +168,8 @@ class TypeSet():
             self.lineage_ids    = np.insert(self.lineage_ids, i, new_lineage_id)
             self.parent_indices = np.insert(self.parent_indices, i, parent_idx)
         #----------------------------------
+        self.mutant_set = self.generate_mutant_set()
+        #----------------------------------
         return
 
 
@@ -208,13 +218,36 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_params(self, index=None, type_id=None):
+    def get_params(self, index=None, type_id=None, include_mutants=False):
         # TODO: make possible to get multiple types by list of indices or ids
         type_idx = np.where(self.type_ids==type_id)[0] if type_id is not None else index
-        if(type_idx is not None):
-            return (self.sigma[type_idx], self.b[type_idx], self.k[type_idx], self.eta[type_idx], self.g[type_idx], self.l[type_idx], self.c[type_idx], self.chi[type_idx], self.mu[type_idx], self.energy_costs[type_idx])
         if(type_idx is None):
-            return (self.sigma[:], self.b[:], self.k[:], self.eta[:], self.g[:], self.l[:], self.c[:], self.chi[:], self.mu[:], self.energy_costs[:])
+            if(include_mutants):
+                return (self.num_types, self.mutant_set.num_types,
+                        np.concatenate([self.sigma,        self.mutant_set.sigma]),
+                        np.concatenate([self.b,            self.mutant_set.b]),
+                        np.concatenate([self.k,            self.mutant_set.k]),
+                        np.concatenate([self.eta,          self.mutant_set.eta]),
+                        np.concatenate([self.g,            self.mutant_set.g]),
+                        np.concatenate([self.l,            self.mutant_set.l]),
+                        np.concatenate([self.c,            self.mutant_set.c]),
+                        np.concatenate([self.chi,          self.mutant_set.chi]),
+                        self.J,
+                        np.concatenate([self.mu,           self.mutant_set.mu]),
+                        np.concatenate([self.energy_costs, self.mutant_set.energy_costs]))
+            else:
+                return (self.num_types, self.sigma, self.b, self.k, self.eta, self.g, self.l, self.c, self.chi, self.J, self.mu, self.energy_costs)
+        else:
+            return (1, self.sigma[type_idx], self.b[type_idx], self.k[type_idx], self.eta[type_idx], self.g[type_idx], self.l[type_idx], self.c[type_idx], self.chi[type_idx], self.J[type_idx, :] if self.J is not None else None, self.mu[type_idx], self.energy_costs[type_idx])
+        
+
+
+
+
+
+
+
+        
 
 
 

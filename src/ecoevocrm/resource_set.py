@@ -10,7 +10,8 @@ class ResourceSet():
     def __init__(self, num_resources=None,
                        rho   = 0,
                        tau   = 0,
-                       omega = 1 ):
+                       omega = 1,
+                       D     = None ):
 
         # Determine the number of resources:
         if(isinstance(rho, (list, np.ndarray))):
@@ -28,6 +29,7 @@ class ResourceSet():
         self.rho   = utils.reshape(rho,   shape=(1, self.num_resources))
         self.tau   = utils.reshape(tau,   shape=(1, self.num_resources))
         self.omega = utils.reshape(omega, shape=(1, self.num_resources))
+        self.D     = utils.reshape(D,     shape=(self.num_resources, self.num_resources)) if D is not None else None
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -54,10 +56,11 @@ class ResourceSet():
     def get_params(self, index=None, resource_id=None):
         # TODO: make possible to get multiple resources by list of indices or ids
         resource_idx = np.where(self.resource_ids==resource_id)[0] if resource_id is not None else index
-        if(resource_idx is not None):
-            return (self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx])
         if(resource_idx is None):
-            return (self.rho[:], self.tau[:], self.omega[:])
+            return (self.num_resources, self.rho, self.tau, self.omega, self.D)
+        else:
+            return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
+        
 
 
         
