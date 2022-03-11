@@ -1,9 +1,10 @@
 import numpy as np
+import numexpr as ne
 import scipy.integrate
 from scipy.integrate._ivp.base import OdeSolver
 
-from numba import jit
-import nbkode
+# from numba import jit
+# import nbkode
 
 from ecoevocrm.type_set import *
 from ecoevocrm.resource_set import *
@@ -36,8 +37,8 @@ class ConsumerResourceSystem():
                  b             = 1,
                  k             = 0,
                  eta           = 1,
-                 g             = 1,
                  l             = 0,
+                 g             = 1,
                  c             = 0,
                  chi           = None,
                  mu            = 0,
@@ -137,8 +138,8 @@ class ConsumerResourceSystem():
         #----------------------------------
         if(N_init is None or R_init is None):
             utils.error(f"Error in ConsumerResourceSystem __init__(): Values for N_init and R_init must be provided.")
-        self.N_series = utils.reshape(N_init, shape=(system_num_types, 1))
-        self.R_series = utils.reshape(R_init, shape=(system_num_resources, 1))
+        self.N_series = utils.reshape(N_init, shape=(system_num_types, 1)).astype(np.float32)
+        self.R_series = utils.reshape(R_init, shape=(system_num_resources, 1)).astype(np.float32)
 
         #----------------------------------
         # Initialize system time:
@@ -197,7 +198,7 @@ class ConsumerResourceSystem():
             if(integration_method == 'default'):
                 num_extant_types = np.count_nonzero(self.N_series[:,-1])
                 if(num_extant_types < self.threshold_precise_integrator):
-                    _integration_method = 'RK45' # accurate stiff integrator
+                    _integration_method = 'LSODA' # accurate stiff integrator
                 else:
                     _integration_method = 'LSODA' # adaptive stiff/non-stiff integrator
             else:
@@ -211,7 +212,7 @@ class ConsumerResourceSystem():
                                              args   = self.get_params(),
                                              t_span = (self.t, self.t+T),
                                              t_eval = np.arange(start=self.t, stop=self.t+T+dt, step=dt) if dt is not None else None,
-                                             events = [self.event_mutation],#, self.event_type_loss],
+                                             events = [],#[self.event_mutation],#, self.event_type_loss],
                                              method = _integration_method )
 
             # params = self.get_params_tensor()
@@ -234,9 +235,9 @@ class ConsumerResourceSystem():
             if(sol.status == 1): # An event occurred
                 if(len(sol.t_events[0]) > 0):
                     print(f"[ Mutation event occurred at  t={self.t:.4f} ]\t\r", end="")
-                    exit()
                     # self.handle_mutation_event()
                     # self.handle_type_loss()
+                    # exit()
                 if(len(sol.t_events[1]) > 0):
                     print(f"[ Type loss event occurred at t={self.t:.4f} ]\t\r", end="")
                     pass
@@ -255,43 +256,64 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @staticmethod
-    @jit(nopython=True, cache=True)
+    # @jit(nopython=True, fastmath=True, cache=True)
     def dynamics(t, variables, 
-                    num_types, num_mutants, sigma, b, k, eta, g, l, c, chi, J, mu, energy_costs,
-                    num_resources, rho, tau, omega, D, resource_consumption_mode, resource_inflow_mode):
+                    num_types, num_mutants, sigma, b, k, eta, l, g, c, chi, J, mu, energy_costs,
+                    num_resources, rho, tau, omega, D, resource_consumption_mode, resource_inflow_mode, deltas, 
+                    energy_uptake_coeffs):
 
-        N_t = np.zeros(num_types+num_mutants) # create an abundance array with 0 abundance for mutants, for use in calculating growth rates of both extant and mutant types below
-        N_t[:num_types] = variables[:num_types]
+        N_t = np.zeros((num_types+num_mutants, 1))
+        N_t[:num_types, 0] = variables[:num_types]
 
         R_t = variables[-1-num_resources:-1]
 
-        # print("N_t", N_t)
+        # cumulative_mutation_propensity = variables[-1] # value is not needed to calc dCumPropMut
 
-        if(resource_consumption_mode == 0): #ConsumerResourceSystem.CONSUMPTION_MODE_FASTEQ):
-            resource_demand      = np.sum(np.multiply(np.expand_dims(N_t, axis=1), sigma), axis=0)
-            resource_consumption = np.multiply(sigma, b/(1 + (resource_demand/k)))
-        elif(resource_consumption_mode == 1): #ConsumerResourceSystem.CONSUMPTION_MODE_LINEAR):
-            resource_consumption = np.multiply(sigma, np.multiply(b, R_t))
-        elif(resource_consumption_mode == 2): #ConsumerResourceSystem.CONSUMPTION_MODE_MONOD):
-            resource_consumption = np.multiply(sigma, np.multiply(b, R_t/(R_t + k)))
+        #------------------------------
+
+        if(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_FASTEQ):
+            resource_demand      = np.sum(np.multiply(N_t, sigma), axis=0)
+            energy_surplus       = np.sum(np.multiply(energy_uptake_coeffs, 1/(k + resource_demand)), axis=1) - energy_costs
+            growth_rate          = np.multiply(g, energy_surplus)
+        elif(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_LINEAR):
+            pass
+        elif(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_MONOD):
+            pass
         else:
-            resource_consumption = np.zeros((num_types, num_resources))
+            pass
 
-        # print("resource_consumption", resource_consumption)
+        growth_rate    = np.multiply(g, energy_surplus_pp)
 
-        energy_uptake  = np.sum( np.multiply(omega, np.multiply((1-l), resource_consumption)), axis=1)
+        dNdt = np.multiply(N_t[:num_types, 0], growth_rate[:num_types]) # only calc dNdt for extant (non-mutant types)
 
-        energy_surplus = energy_uptake - energy_costs
 
-        # print("energy_costs", energy_costs)
 
-        growth_rate    = np.multiply(g, energy_surplus)
+            # resource_demand      = np.sum(np.multiply(np.expand_dims(N_t, axis=1), sigma), axis=0)
+            # resource_demand      = np.sum(np.multiply(N_t, sigma), axis=0)
+            # resource_yemand      = np.sum(ne.evaluate("N_t * sigma"), axis=0)
+            # resource_zemand      = ne.evaluate("sum(N_t * sigma, axis=0)")
+            # resource_consumption = np.multiply(sigma, b/(1 + (resource_demand/k)))
+        # elif(resource_consumption_mode == 1): #ConsumerResourceSystem.CONSUMPTION_MODE_LINEAR):
+        #     resource_consumption = np.multiply(sigma, np.multiply(b, R_t))
+        # elif(resource_consumption_mode == 2): #ConsumerResourceSystem.CONSUMPTION_MODE_MONOD):
+        #     resource_consumption = np.multiply(sigma, np.multiply(b, R_t/(R_t + k)))
+        # else:
+        #     resource_consumption = np.zeros((num_types, num_resources))
 
-        # print("growth_rate", growth_rate)
+        # energy_uptake  = np.sum( np.multiply(omega, np.multiply((1-l), resource_consumption)), axis=1)
 
-        dNdt = np.multiply(N_t[:num_types], growth_rate[:num_types]) # only calc dNdt for extant (non-mutant types)
+        # energy_surplus = energy_uptake - energy_costs
 
-        # print("dNdt", dNdt)
+        # energy_surplus_og = np.sum(np.multiply(omega, np.multiply((1-l), np.multiply(sigma, b/(1 + (resource_demand/k))))), axis=1) - energy_costs
+
+        # energy_surplus_pp = np.sum(np.multiply(energy_uptake_coeffs, 1/(k + resource_demand)), axis=1) - energy_costs
+
+        # print("energy_surplus_og", energy_surplus_og)
+        # print("energy_surplus_pp", energy_surplus_pp)
+
+        
+
+        #------------------------------
 
         if(resource_inflow_mode == 0):
             resource_inflow = np.zeros((1, num_resources))
@@ -307,30 +329,21 @@ class ConsumerResourceSystem():
                 resource_secretion = np.divide(np.dot(np.multiply(omega, np.sum(np.multiply(np.expand_dims(N_t, axis=1), np.multiply(l, resource_consumption)), axis=0)), D.T), omega, where=(omega>0), out=np.zeros_like(omega)).ravel()
                 dRdt = ( resource_inflow - np.multiply(1/tau, R_t) - np.sum(np.multiply(np.expand_dims(N_t, axis=1), resource_consumption), axis=0) + resource_secretion ).ravel()
 
-        cumulative_mutation_propensity = variables[-1]
-
-        # print("N_t", N_t, N_t.shape)
-        # print("mu", mu, mu.shape)
-        # print(np.multiply(N_t[:num_types], mu[:num_types]), np.multiply(N_t[:num_types], mu[:num_types]).shape)
-        # print(np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources, axis=0), np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources, axis=0).shape)
-        # print(np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources), np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources).shape)
-        # print(np.multiply(growth_rate[-num_mutants:], np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources, axis=0)), np.multiply(growth_rate[-num_mutants:], np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources, axis=0)).shape)
-        # print(np.multiply(growth_rate[-num_mutants:], np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources)), np.multiply(growth_rate[-num_mutants:], np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources)).shape)
-
-        mutation_propensities = np.maximum(0, np.multiply(growth_rate[-num_mutants:], np.repeat(np.multiply(N_t[:num_types], mu[:num_types]), repeats=num_resources)))
-                                                          
-
-        # dCumPropMut = np.array([np.sum(self.mutation_propensities(_N_t, _R_t))])
-        dCumPropMut = np.array([ np.sum(mutation_propensities) ])
-
-        # print("mutation_propensities", mutation_propensities)
-
-        # print("dCumPropMut", dCumPropMut)
-        
         #------------------------------
 
-        # exit()
+        mutation_propensities = np.maximum(0, np.multiply(growth_rate[-num_mutants:], np.repeat(np.multiply(N_t[:num_types, 0], mu[:num_types]), repeats=num_resources)))
+                                                          
+        dCumPropMut = np.sum(mutation_propensities, keepdims=True)
         
+        #------------------------------
+        
+        # deltas = np.zeros(num_types+num_resources+1)
+        deltas[:num_types]          = dNdt
+        deltas[-1-num_resources:-1] = dRdt
+        deltas[-1]                  = dCumPropMut
+
+        # return deltas
+
         return np.concatenate((dNdt, dRdt, dCumPropMut))
 
         # exit()
@@ -483,10 +496,21 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_params(self):
-        return (self.type_set.get_params(include_mutants=True)
-                + self.resource_set.get_params()
-                # + self.biochemistry.get_params()
-                + (self.resource_consumption_mode, self.resource_inflow_mode))
+
+        type_params_wmuts = self.type_set.get_params(include_mutants=True)
+        resource_params   = self.resource_set.get_params()
+
+        sigma_wmuts = type_params_wmuts['sigma']
+        b_wmuts     = type_params_wmuts['b']
+        k_wmuts     = type_params_wmuts['k']
+        l_wmuts     = type_params_wmuts['l']
+
+        energy_uptake_coeffs = np.multiply(self.resource_set.omega, np.multiply((1-l_wmuts), np.multiply(sigma_wmuts, np.multiply(b_wmuts, k_wmuts))))
+
+        return (  tuple(type_params_wmuts.values()) + tuple(resource_params.values())
+                + (self.resource_consumption_mode, self.resource_inflow_mode)
+                + (np.zeros(self.type_set.num_types+self.resource_set.num_resources+1),)
+                + (energy_uptake_coeffs,) )
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -508,7 +532,7 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def resource_demand(N, sigma):
         return np.sum(np.multiply(N[:, np.newaxis], sigma), axis=0)
 
@@ -516,7 +540,7 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def resource_consumption(N, R, sigma, b, k, resource_consumption_mode):
         if(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_FASTEQ):
             resource_demand = ConsumerResourceSystem.resource_demand(N, sigma)
@@ -538,7 +562,7 @@ class ConsumerResourceSystem():
     #     return np.sum( np.multiply(omega, np.multiply((1-l), ConsumerResourceSystem.resource_consumption(N, R, sigma, b, k))), axis=1)
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def energy_uptake(resource_consumption, l, omega):
         return np.sum( np.multiply(omega, np.multiply((1-l), resource_consumption)), axis=1)
 
@@ -550,7 +574,7 @@ class ConsumerResourceSystem():
     #     return ConsumerResourceSystem.energy_uptake(N, R, sigma, b, k, l, omega) - energy_costs
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def energy_surplus(resource_consumption, l, omega, energy_costs):
         return ConsumerResourceSystem.energy_uptake(resource_consumption, l, omega) - energy_costs
 
@@ -562,7 +586,7 @@ class ConsumerResourceSystem():
     #     return np.multiply(g, ConsumerResourceSystem.energy_surplus(N, R, sigma, b, k, l, omega, energy_costs))
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def growth_rate(resource_consumption, g, l, omega, energy_costs):
         return np.multiply(g, ConsumerResourceSystem.energy_surplus(resource_consumption, l, omega, energy_costs))
 
@@ -570,7 +594,7 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def resource_inflow(R, rho, resource_inflow_mode):
         if(self.resource_inflow_mode == 'none' or self.resource_inflow_mode == 'zero'):
             inflow = np.zeros(len(R))
@@ -583,7 +607,7 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @staticmethod
-    @jit(nopython=True)
+    # @jit(nopython=True)
     def resource_secretion(resource_consumption, N, l, omega, D):
         return np.divide(np.dot(np.multiply(omega, np.sum(np.multiply(N[:,np.newaxis], np.multiply(l, resource_consumption)), axis=0)), D.T), omega, where=(omega>0), out=np.zeros_like(omega)).ravel()
 

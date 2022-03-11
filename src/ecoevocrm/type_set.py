@@ -64,10 +64,8 @@ class TypeSet():
                 new_lineage_id = self.add_type_to_phylogeny(i)
                 self.lineage_ids[i] = new_lineage_id
 
-        print("typeset here")
         if(not is_mutant_set):
             self.mutant_set = self.generate_mutant_set()
-        print("typeset here2")
                 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -223,22 +221,59 @@ class TypeSet():
         type_idx = np.where(self.type_ids==type_id)[0] if type_id is not None else index
         if(type_idx is None):
             if(include_mutants):
-                return (self.num_types, self.mutant_set.num_types,
-                        np.concatenate([self.sigma,        self.mutant_set.sigma]),
-                        np.concatenate([self.b,            self.mutant_set.b]),
-                        np.concatenate([self.k,            self.mutant_set.k]),
-                        np.concatenate([self.eta,          self.mutant_set.eta]),
-                        np.concatenate([self.g,            self.mutant_set.g]),
-                        np.concatenate([self.l,            self.mutant_set.l]),
-                        np.concatenate([self.c,            self.mutant_set.c]),
-                        np.concatenate([self.chi,          self.mutant_set.chi]),
-                        self.J,
-                        np.concatenate([self.mu,           self.mutant_set.mu]),
-                        np.concatenate([self.energy_costs, self.mutant_set.energy_costs]))
+                return {'num_types':    self.num_types,
+                        'num_mutants':  self.mutant_set.num_types,
+                        'sigma':        np.concatenate([self.sigma,        self.mutant_set.sigma]),
+                        'b':            np.concatenate([self.b,            self.mutant_set.b]),
+                        'k':            np.concatenate([self.k,            self.mutant_set.k]),
+                        'eta':          np.concatenate([self.eta,          self.mutant_set.eta]),
+                        'l':            np.concatenate([self.l,            self.mutant_set.l]),
+                        'g':            np.concatenate([self.g,            self.mutant_set.g]),
+                        'c':            np.concatenate([self.c,            self.mutant_set.c]),
+                        'chi':          np.concatenate([self.chi,          self.mutant_set.chi]),
+                        'J':            self.J,
+                        'mu':           np.concatenate([self.mu,           self.mutant_set.mu]),
+                        'energy_costs': np.concatenate([self.energy_costs, self.mutant_set.energy_costs])}
+                # return (self.num_types, self.mutant_set.num_types,
+                #         np.concatenate([self.sigma,        self.mutant_set.sigma]),
+                #         np.concatenate([self.b,            self.mutant_set.b]),
+                #         np.concatenate([self.k,            self.mutant_set.k]),
+                #         np.concatenate([self.eta,          self.mutant_set.eta]),
+                #         np.concatenate([self.l,            self.mutant_set.l]),
+                #         np.concatenate([self.g,            self.mutant_set.g]),
+                #         np.concatenate([self.c,            self.mutant_set.c]),
+                #         np.concatenate([self.chi,          self.mutant_set.chi]),
+                #         self.J,
+                #         np.concatenate([self.mu,           self.mutant_set.mu]),
+                #         np.concatenate([self.energy_costs, self.mutant_set.energy_costs]))
             else:
-                return (self.num_types, self.sigma, self.b, self.k, self.eta, self.g, self.l, self.c, self.chi, self.J, self.mu, self.energy_costs)
+                return {'num_types':    self.num_types,
+                        'sigma':        self.sigma,
+                        'b':            self.b,
+                        'k':            self.k,
+                        'eta':          self.eta,
+                        'l':            self.l,
+                        'g':            self.g,
+                        'c':            self.c,
+                        'chi':          self.chi,
+                        'J':            self.J,
+                        'mu':           self.mu,
+                        'energy_costs': self.energy_costs}
+                # return (self.num_types, self.sigma, self.b, self.k, self.eta, self.l, self.g, self.c, self.chi, self.J, self.mu, self.energy_costs)
         else:
-            return (1, self.sigma[type_idx], self.b[type_idx], self.k[type_idx], self.eta[type_idx], self.g[type_idx], self.l[type_idx], self.c[type_idx], self.chi[type_idx], self.J[type_idx, :] if self.J is not None else None, self.mu[type_idx], self.energy_costs[type_idx])
+            return {'num_types':    1,
+                    'sigma':        self.sigma[type_idx],
+                    'b':            self.b[type_idx],
+                    'k':            self.k[type_idx],
+                    'eta':          self.eta[type_idx],
+                    'l':            self.l[type_idx],
+                    'g':            self.g[type_idx],
+                    'c':            self.c[type_idx],
+                    'chi':          self.chi[type_idx],
+                    'J':            self.J[type_idx,:],
+                    'mu':           self.mu[type_idx],
+                    'energy_costs': self.energy_costs[type_idx]}
+            # return (1, self.sigma[type_idx], self.b[type_idx], self.k[type_idx], self.eta[type_idx], self.l[type_idx], self.g[type_idx], self.c[type_idx], self.chi[type_idx], self.J[type_idx, :] if self.J is not None else None, self.mu[type_idx], self.energy_costs[type_idx])
         
 
 

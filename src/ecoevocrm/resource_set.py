@@ -57,9 +57,19 @@ class ResourceSet():
         # TODO: make possible to get multiple resources by list of indices or ids
         resource_idx = np.where(self.resource_ids==resource_id)[0] if resource_id is not None else index
         if(resource_idx is None):
-            return (self.num_resources, self.rho, self.tau, self.omega, self.D)
+            return {'num_resources': self.num_resources,
+                    'rho':           self.rho,
+                    'tau':           self.tau,
+                    'omega':         self.omega,
+                    'D':             self.D}
+            # return (self.num_resources, self.rho, self.tau, self.omega, self.D)
         else:
-            return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
+            return {'num_resources': 1,
+                    'rho':           self.rho[resource_idx],
+                    'tau':           self.tau[resource_idx],
+                    'omega':         self.omega[resource_idx],
+                    'D':             self.D[resource_idx,:]}
+            # return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
         
 
 
