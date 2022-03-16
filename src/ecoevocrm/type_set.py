@@ -126,6 +126,103 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    # def do_add_fromempty(self, new_type_set, new_type_idx):
+
+    #     # print("self", self.sigma.shape)
+    #     # print("idx ", new_type_idx)
+    #     # print("new ", new_type_set.sigma.shape)
+        
+    #     sigma_new = np.empty(shape=(self.num_types+new_type_set.num_types, self.num_traits))
+    #     sigma_new[:new_type_idx] = self.sigma[:new_type_idx]
+    #     sigma_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.sigma
+    #     sigma_new[new_type_idx+new_type_set.num_types:] = self.sigma[new_type_idx:]
+    #     self.sigma = sigma_new
+
+    #     b_new = np.empty(shape=(self.num_types+new_type_set.num_types, self.num_traits))
+    #     b_new[:new_type_idx] = self.b[:new_type_idx]
+    #     b_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.b
+    #     b_new[new_type_idx+new_type_set.num_types:] = self.b[new_type_idx:]
+    #     self.b = b_new
+
+    #     k_new = np.empty(shape=(self.num_types+new_type_set.num_types, self.num_traits))
+    #     k_new[:new_type_idx] = self.k[:new_type_idx]
+    #     k_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.k
+    #     k_new[new_type_idx+new_type_set.num_types:] = self.k[new_type_idx:]
+    #     self.k = k_new
+
+    #     l_new = np.empty(shape=(self.num_types+new_type_set.num_types, self.num_traits))
+    #     l_new[:new_type_idx] = self.l[:new_type_idx]
+    #     l_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.l
+    #     l_new[new_type_idx+new_type_set.num_types:] = self.l[new_type_idx:]
+    #     self.l = l_new
+
+    #     eta_new = np.empty(shape=(self.num_types+new_type_set.num_types, self.num_traits))
+    #     eta_new[:new_type_idx] = self.eta[:new_type_idx]
+    #     eta_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.eta
+    #     eta_new[new_type_idx+new_type_set.num_types:] = self.eta[new_type_idx:]
+    #     self.eta = eta_new
+
+    #     g_new = np.empty(shape=(self.num_types+new_type_set.num_types))
+    #     g_new[:new_type_idx] = self.g[:new_type_idx]
+    #     g_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.g
+    #     g_new[new_type_idx+new_type_set.num_types:] = self.g[new_type_idx:]
+    #     self.g = g_new
+
+    #     c_new = np.empty(shape=(self.num_types+new_type_set.num_types))
+    #     c_new[:new_type_idx] = self.c[:new_type_idx]
+    #     c_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.c
+    #     c_new[new_type_idx+new_type_set.num_types:] = self.c[new_type_idx:]
+    #     self.c = c_new
+
+    #     chi_new = np.empty(shape=(self.num_types+new_type_set.num_types, self.num_traits))
+    #     chi_new[:new_type_idx] = self.chi[:new_type_idx]
+    #     chi_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.chi
+    #     chi_new[new_type_idx+new_type_set.num_types:] = self.chi[new_type_idx:]
+    #     self.chi = chi_new
+
+    #     mu_new = np.empty(shape=(self.num_types+new_type_set.num_types))
+    #     mu_new[:new_type_idx] = self.mu[:new_type_idx]
+    #     mu_new[new_type_idx:new_type_idx+new_type_set.num_types] = new_type_set.mu
+    #     mu_new[new_type_idx+new_type_set.num_types:] = self.mu[new_type_idx:]
+    #     self.mu = mu_new
+
+    # def do_add_concatenate(self, new_type_set, new_type_idx):
+
+    #     self.sigma = np.concatenate([self.sigma[:new_type_idx], new_type_set.sigma, self.sigma[new_type_idx:]])
+    #     self.b = np.concatenate([self.b[:new_type_idx], new_type_set.b, self.b[new_type_idx:]])
+    #     self.k = np.concatenate([self.k[:new_type_idx], new_type_set.k, self.k[new_type_idx:]])
+    #     self.eta = np.concatenate([self.eta[:new_type_idx], new_type_set.eta, self.eta[new_type_idx:]])
+    #     self.l = np.concatenate([self.l[:new_type_idx], new_type_set.l, self.l[new_type_idx:]])
+    #     self.g = np.concatenate([self.g[:new_type_idx], new_type_set.g, self.g[new_type_idx:]])
+    #     self.c = np.concatenate([self.c[:new_type_idx], new_type_set.c, self.c[new_type_idx:]])
+    #     self.chi = np.concatenate([self.chi[:new_type_idx], new_type_set.chi, self.chi[new_type_idx:]])
+    #     self.mu = np.concatenate([self.sigma[:new_type_idx], new_type_set.sigma, self.sigma[new_type_idx:]])
+
+    # # def do_add_insert(self, new_type_set, new_type_idx):
+
+    # #     new_sigma = np.insert(self.sigma, new_type_idx, new_type_set.sigma, axis=0)
+    # #     new_b     = np.insert(self.b,     new_type_idx, new_type_set.b,     axis=0)
+    # #     new_k     = np.insert(self.k,     new_type_idx, new_type_set.k,     axis=0)
+    # #     new_eta   = np.insert(self.eta,   new_type_idx, new_type_set.eta,   axis=0)
+    # #     new_l     = np.insert(self.l,     new_type_idx, new_type_set.l,     axis=0)
+    # #     new_g     = np.insert(self.g,     new_type_idx, new_type_set.g,     axis=0)
+    # #     new_c     = np.insert(self.c,     new_type_idx, new_type_set.c,     axis=0)
+    # #     new_mu    = np.insert(self.mu,    new_type_idx, new_type_set.mu,    axis=0)
+    # #     new_chi   = np.insert(self.chi,   new_type_idx, new_type_set.chi,   axis=0)
+
+    # def do_add_insert(self, new_type_set, new_type_idx):
+
+    #     self.sigma = np.insert(self.sigma, new_type_idx, new_type_set.sigma, axis=0)
+    #     self.b     = np.insert(self.b,     new_type_idx, new_type_set.b,     axis=0)
+    #     self.k     = np.insert(self.k,     new_type_idx, new_type_set.k,     axis=0)
+    #     self.eta   = np.insert(self.eta,   new_type_idx, new_type_set.eta,   axis=0)
+    #     self.l     = np.insert(self.l,     new_type_idx, new_type_set.l,     axis=0)
+    #     self.g     = np.insert(self.g,     new_type_idx, new_type_set.g,     axis=0)
+    #     self.c     = np.insert(self.c,     new_type_idx, new_type_set.c,     axis=0)
+    #     self.mu    = np.insert(self.mu,    new_type_idx, new_type_set.mu,    axis=0)
+    #     self.chi   = np.insert(self.chi,   new_type_idx, new_type_set.chi,   axis=0)
+
+
     def add_type(self, type_set=None, sigma=None, b=None, k=None, eta=None, l=None, g=None, c=None, chi=None, mu=None, index=None, parent_index=None, parent_id=None):
         new_type_idx = index if index is not None else self.num_types # default to adding to end of matrices
         ref_type_idx = new_type_idx - 1
@@ -151,6 +248,30 @@ class TypeSet():
         if(self.num_traits != new_type_set.num_traits): 
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({new_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
         #----------------------------------
+        
+        #----------------------------------
+        #----------------------------------
+        #----------------------------------
+
+        # methods = np.random.permutation(4)
+        # for method in methods:
+
+        # method = 0 #np.random.choice([0, 1, 2])
+        # if(method == 0):
+        #     self.do_add_fromempty(new_type_set, new_type_idx)
+        # elif(method == 1):
+        #     self.do_add_concatenate(new_type_set, new_type_idx)
+        # elif(method == 2):
+        #     self.do_add_insert(new_type_set, new_type_idx)
+
+        
+
+        # # self.do_add(new_type_set, new_type_idx)
+
+        #----------------------------------
+        #----------------------------------
+        #----------------------------------
+
         self.sigma = np.insert(self.sigma, new_type_idx, new_type_set.sigma, axis=0)
         self.b     = np.insert(self.b,     new_type_idx, new_type_set.b,     axis=0)
         self.k     = np.insert(self.k,     new_type_idx, new_type_set.k,     axis=0)
@@ -160,7 +281,9 @@ class TypeSet():
         self.c     = np.insert(self.c,     new_type_idx, new_type_set.c,     axis=0)
         self.mu    = np.insert(self.mu,    new_type_idx, new_type_set.mu,    axis=0)
         self.chi   = np.insert(self.chi,   new_type_idx, new_type_set.chi,   axis=0)
+
         #----------------------------------
+
         self.energy_costs = np.insert(self.energy_costs, new_type_idx, new_type_set.energy_costs)
         # self.update_phenotypic_costs()
         #----------------------------------

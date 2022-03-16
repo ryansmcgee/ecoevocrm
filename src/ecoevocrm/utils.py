@@ -11,28 +11,30 @@ def error(message, trigger_exit=True):
 
 
 def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
-	# Set the target shape to (self.num_types, self.num_resources) if None is given:
-	target_shape = shape # (self.num_types, self.num_resources) if shape is None else shape
-	# Enforce that arr is a 2d numpy array:
-	arr = np.array(a, dtype=dtype) if(isinstance(a, (list, np.ndarray))) else np.array([a], dtype=dtype)
-	orig_shape = arr.shape
-	if(arr.ndim == 1):
-	   arr = np.reshape(arr, (1, arr.size))
-	# If a 1d array is given, tile it to match the system dimensions if possible:
-	if(arr.shape[0] == 1):
-	   if((arr.shape[1] != target_shape[1] or (arr.shape[1] == target_shape[1] and prioritize_col_vector_if_1d)) and arr.shape[1] == target_shape[0]):
-	        arr = arr.T # make the row array a col array
-	   else:
-	        arr = np.tile(arr, (target_shape[0], 1))
-	if(arr.shape[1] == 1):
-	   arr = np.tile(arr, (1, target_shape[1]))
-	# Check if array was able to be reshaped to system dimensions:
-	if(arr.shape != target_shape):
-	   if(shape is None):
-	        error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the system dimensionality ({self.num_types} types, {self.num_resources} resources).")
-	   else:
-	        error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the target dimensionality {target_shape}.")
-	return  arr
+	target_shape = shape
+	if(isinstance(a, (list, np.ndarray)) and a.shape == target_shape):
+		return a
+	else:
+		# Enforce that arr is a 2d numpy array:
+		arr = np.array(a, dtype=dtype) if(isinstance(a, (list, np.ndarray))) else np.array([a], dtype=dtype)
+		orig_shape = arr.shape
+		if(arr.ndim == 1):
+		   arr = np.reshape(arr, (1, arr.size))
+		# If a 1d array is given, tile it to match the system dimensions if possible:
+		if(arr.shape[0] == 1):
+		   if((arr.shape[1] != target_shape[1] or (arr.shape[1] == target_shape[1] and prioritize_col_vector_if_1d)) and arr.shape[1] == target_shape[0]):
+		        arr = arr.T # make the row array a col array
+		   else:
+		        arr = np.tile(arr, (target_shape[0], 1))
+		if(arr.shape[1] == 1):
+		   arr = np.tile(arr, (1, target_shape[1]))
+		# Check if array was able to be reshaped to system dimensions:
+		if(arr.shape != target_shape):
+		   if(shape is None):
+		        error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the system dimensionality ({self.num_types} types, {self.num_resources} resources).")
+		   else:
+		        error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the target dimensionality {target_shape}.")
+		return  arr
 
 
 def treat_as_list(val):
