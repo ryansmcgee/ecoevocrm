@@ -10,6 +10,9 @@ def error(message, trigger_exit=True):
 		sys.exit()
 
 
+	
+
+
 def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
 	target_shape = shape
 	if(isinstance(a, (list, np.ndarray)) and a.shape == target_shape):
