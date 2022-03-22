@@ -10,7 +10,7 @@ def error(message, trigger_exit=True):
 		sys.exit()
 
 
-	
+
 
 
 def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
@@ -44,7 +44,7 @@ def treat_as_list(val):
     if(not isinstance(val, (list, np.ndarray)) and val is not None):
         return [val]
     elif(isinstance(val, (np.ndarray))):
-        return val.flatten()
+        return val.ravel()
     else:
         return val
 

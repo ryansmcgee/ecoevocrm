@@ -84,18 +84,18 @@ class TypeSet():
         # Assign unique ids to each type (determined by hash of all param values):
         self.type_ids = np.array([self.get_type_id(i) for i in range(self.num_types)]) if has_type_ids else None
 
-        self.lineage_ids    = np.array([None for i in range(self.num_types)] if lineage_ids is None else lineage_ids)
+        self.lineage_ids    = (np.array([None for i in range(self.num_types)] if lineage_ids is None else lineage_ids)) if has_phylogeny else None
         self.parent_indices = np.array([None for i in range(self.num_types)])
-        self.phylogeny      = {}
+        self.phylogeny      = {} if has_phylogeny else None
         if(has_phylogeny):
             for i in range(self.num_types):
                 new_lineage_id = self.add_type_to_phylogeny(i)
                 self.lineage_ids[i] = new_lineage_id
 
-        if(has_mutant_set):
-            self.generate_mutant_set() 
-        else:
-            self.mutant_set = None
+        # if(has_mutant_set):
+        #     self.generate_mutant_set() 
+        # else:
+        #     self.mutant_set = None
 
         # print("done __init__")
         # exit()
@@ -153,6 +153,7 @@ class TypeSet():
 
         #----------------------------------
         # If none of the above conditions met (hasn't returned by now):
+        exit()
         if(has_trait_dim):
             utils.error(f"Error in TypeSet.preprocess_params(): input with shape {arr.shape} does not correspond to the number of types ({self.num_types}) and/or traits ({self.num_traits}).")
         else:
@@ -211,8 +212,8 @@ class TypeSet():
         mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, c=c_mut, chi=chi_mut, J=self.J, mu=mu_mut, 
                              has_type_ids=has_type_ids, has_phylogeny=has_phylogeny, has_mutant_set=False)
         #----------------------------------
-        self.mutant_set = mutant_set
-        # return mutant_set
+        # self.mutant_set = mutant_set
+        return mutant_set
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -381,21 +382,22 @@ class TypeSet():
         #----------------------------------
         self.num_types = self.sigma.shape[0]
         #----------------------------------
-        for i in range(new_type_idx, new_type_idx+new_type_set.num_types):
-            new_lineage_id      = self.add_type_to_phylogeny(i, parent_idx, parent_id)
-            self.lineage_ids    = np.insert(self.lineage_ids, i, new_lineage_id)
-            self.parent_indices = np.insert(self.parent_indices, i, parent_idx)
+        if(self.phylogeny is not None):
+            for i in range(new_type_idx, new_type_idx+new_type_set.num_types):
+                new_lineage_id      = self.add_type_to_phylogeny(i, parent_idx, parent_id)
+                self.lineage_ids    = np.insert(self.lineage_ids, i, new_lineage_id)
+                self.parent_indices = np.insert(self.parent_indices, i, parent_idx)
         #----------------------------------
-        # print("here")
-        if(self.mutant_set is not None):
-            # print("doin it")
-            if(new_type_set.mutant_set is None):
-                # print("\nnew_type_set.generate_mutant_set()")
-                new_type_set.generate_mutant_set()
-            # print(new_type_set.mutant_set.sigma.shape)
-            self.mutant_set.add_type(new_type_set.mutant_set, index=new_type_idx*self.num_traits)
-            # print(self.mutant_set.sigma.shape)
-        # self.mutant_set = self.generate_mutant_set()
+        # # print("here")
+        # if(self.mutant_set is not None):
+        #     # print("doin it")
+        #     if(new_type_set.mutant_set is None):
+        #         # print("\nnew_type_set.generate_mutant_set()")
+        #         new_type_set.generate_mutant_set()
+        #     # print(new_type_set.mutant_set.sigma.shape)
+        #     self.mutant_set.add_type(new_type_set.mutant_set, index=new_type_idx*self.num_traits)
+        #     # print(self.mutant_set.sigma.shape)
+        # # self.mutant_set = self.generate_mutant_set()
         #----------------------------------
         # print("check")
         # if(self.mutant_set is not None): 
@@ -404,6 +406,36 @@ class TypeSet():
             # print(self.mutant_set.b, self.mutant_set.b.shape)
         return
 
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def remove_type(self, index=None, type_id=None):
+        type_idx = np.where(np.in1d(self.type_ids, utils.treat_as_list(type_id))) if type_id is not None else index
+        if(type_idx is None):
+            type_idx = np.arange(0, self.num_types, 1)
+        #----------------------------------
+        keep_mask = np.ones(self.num_types, dtype=bool)
+        keep_mask[type_idx] = False
+
+        self.sigma = self.sigma[keep_mask]
+
+        self.b     = self.b[keep_mask]   if self.b.ndim == 2   else self.b
+        self.k     = self.k[keep_mask]   if self.k.ndim == 2   else self.k
+        self.eta   = self.eta[keep_mask] if self.eta.ndim == 2 else self.eta
+        self.l     = self.l[keep_mask]   if self.l.ndim == 2   else self.l
+        self.g     = self.g[keep_mask]   if self.g.ndim == 2   else self.g
+        self.c     = self.c[keep_mask]   if self.c.ndim == 2   else self.c
+        self.chi   = self.chi[keep_mask] if self.chi.ndim == 2 else self.chi
+        self.mu    = self.mu[keep_mask]  if self.mu.ndim == 2  else self.mu
+
+        if(self.type_ids is not None):
+            self.type_ids = self.type_ids[keep_mask]
+        if(self.phylogeny is not None):
+            # TODO: properly remove from phylogeny dict
+            self.lineage_ids    = self.lineage_ids[keep_mask]
+            self.parent_indices = self.parent_indices[keep_mask]
+
+        self.num_types = self.sigma.shape[0]
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -436,6 +468,7 @@ class TypeSet():
             utils.error(f"Error in TypeSet get_type(): A type index or type id must be given.")
         _num_types = 1 if type_idx.ndim == 0 else len(type_idx)
         # print("\nget_type")
+        # print("self.lineage_ids", self.lineage_ids)
         return TypeSet(sigma = self.sigma[type_idx], 
                         b    = self.b[type_idx].reshape(_num_types, self.num_traits)   if self.b.ndim == 2   else self.b, 
                         k    = self.k[type_idx].reshape(_num_types, self.num_traits)   if self.k.ndim == 2   else self.k, 
@@ -445,7 +478,7 @@ class TypeSet():
                         c    = self.c[type_idx].reshape(_num_types, 1)                 if self.c.ndim == 2   else self.c, 
                         chi  = self.chi[type_idx].reshape(_num_types, self.num_traits) if self.chi.ndim == 2 else self.chi, 
                         mu   = self.mu[type_idx].reshape(_num_types, 1)                if self.mu.ndim == 2  else self.mu,
-                        lineage_ids = np.array(self.lineage_ids[type_idx]).flatten(),
+                        lineage_ids = np.array(self.lineage_ids[type_idx]).flatten() if self.lineage_ids is not None else None,
                         has_mutant_set = False)
 
 
@@ -461,10 +494,17 @@ class TypeSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_mutant_indices(self, index):
+        # print("***** ", index)
         type_idx = utils.treat_as_list(index)
-        # print( [i for i in range(self.mutant_set.num_types) if i // self.mutant_set.num_traits in type_idx] )
-        # print( np.where(np.in1d(np.arange(0, self.mutant_set.num_types, 1)//self.mutant_set.num_traits, type_idx))[0] )
-        return np.where(np.in1d(np.arange(0, self.mutant_set.num_types, 1)//self.mutant_set.num_traits, type_idx))[0]
+        # print("******", type_idx)
+        mutant_indices = [m for muts_of_idx in [[i for i in range(idx*self.num_traits, (idx+1)*self.num_traits)] for idx in type_idx] for m in muts_of_idx]
+        return mutant_indices
+
+    # def get_mutant_indices(self, index):
+    #     type_idx = utils.treat_as_list(index)
+    #     # print( [i for i in range(self.mutant_set.num_types) if i // self.mutant_set.num_traits in type_idx] )
+    #     # print( np.where(np.in1d(np.arange(0, self.mutant_set.num_types, 1)//self.mutant_set.num_traits, type_idx))[0] )
+    #     return np.where(np.in1d(np.arange(0, self.mutant_set.num_types, 1)//self.mutant_set.num_traits, type_idx))[0]
 
     def get_parent_indices(self, index):
         mut_idx = utils.treat_as_list(index)
@@ -479,36 +519,49 @@ class TypeSet():
             type_idx = np.arange(0, self.num_types, 1)
         #----------------------------------
         # print(type_idx)
-        mut_idx = self.get_mutant_indices(type_idx)
+        # mut_idx = self.get_mutant_indices(type_idx)
         # print(mut_idx)
 
-        if(include_mutants):
-            return {'num_types':    len(type_idx),
-                    'num_mutants':  len(mut_idx),
-                    'sigma':        np.concatenate([self.sigma[type_idx], self.mutant_set.sigma[mut_idx]]),
-                    'b':            np.concatenate([self.b[type_idx],     self.mutant_set.b[mut_idx]])   if self.b.ndim == 2   else self.b,
-                    'k':            np.concatenate([self.k[type_idx],     self.mutant_set.k[mut_idx]])   if self.k.ndim == 2   else self.k,
-                    'eta':          np.concatenate([self.eta[type_idx],   self.mutant_set.eta[mut_idx]]) if self.eta.ndim == 2 else self.eta,
-                    'l':            np.concatenate([self.l[type_idx],     self.mutant_set.l[mut_idx]])   if self.l.ndim == 2   else self.l,
-                    'g':            np.concatenate([self.g[type_idx],     self.mutant_set.g[mut_idx]])   if self.g.ndim == 2   else self.g,
-                    'c':            np.concatenate([self.c[type_idx],     self.mutant_set.c[mut_idx]])   if self.c.ndim == 2   else self.c,
-                    'chi':          np.concatenate([self.chi[type_idx],   self.mutant_set.chi[mut_idx]]) if self.chi.ndim == 2 else self.chi,
-                    'J':            self.J,
-                    'mu':           np.concatenate([self.mu[type_idx],           self.mutant_set.mu[mut_idx]]) if self.mu.ndim == 2 else self.mu,
-                    'energy_costs': np.concatenate([self.energy_costs[type_idx], self.mutant_set.energy_costs[mut_idx]])}
-        else:
-            return {'num_types':    self.num_types,
-                    'sigma':        self.sigma,
-                    'b':            self.b,
-                    'k':            self.k,
-                    'eta':          self.eta,
-                    'l':            self.l,
-                    'g':            self.g,
-                    'c':            self.c,
-                    'chi':          self.chi,
-                    'J':            self.J,
-                    'mu':           self.mu,
-                    'energy_costs': self.energy_costs}
+        return {'num_types':    len(type_idx),
+                'sigma':        self.sigma[type_idx],
+                'b':            self.b   if self.b.ndim < 2   else self.b[type_idx],
+                'k':            self.k   if self.k.ndim < 2   else self.k[type_idx],
+                'eta':          self.eta if self.eta.ndim < 2 else self.eta[type_idx],
+                'l':            self.l   if self.l.ndim < 2   else self.l[type_idx],
+                'g':            self.g   if self.g.ndim < 2   else self.g[type_idx],
+                'c':            self.c   if self.c.ndim < 2   else self.c[type_idx],
+                'chi':          self.chi if self.chi.ndim < 2 else self.chi[type_idx],
+                'J':            self.J,
+                'mu':           self.mu  if self.mu.ndim < 2  else self.mu[type_idx],
+                'energy_costs': self.energy_costs[type_idx]}
+
+        # if(include_mutants):
+        #     return {'num_types':    len(type_idx),
+        #             'num_mutants':  len(mut_idx),
+        #             'sigma':        np.concatenate([self.sigma[type_idx], self.mutant_set.sigma[mut_idx]]),
+        #             'b':            np.concatenate([self.b[type_idx],     self.mutant_set.b[mut_idx]])   if self.b.ndim == 2   else self.b,
+        #             'k':            np.concatenate([self.k[type_idx],     self.mutant_set.k[mut_idx]])   if self.k.ndim == 2   else self.k,
+        #             'eta':          np.concatenate([self.eta[type_idx],   self.mutant_set.eta[mut_idx]]) if self.eta.ndim == 2 else self.eta,
+        #             'l':            np.concatenate([self.l[type_idx],     self.mutant_set.l[mut_idx]])   if self.l.ndim == 2   else self.l,
+        #             'g':            np.concatenate([self.g[type_idx],     self.mutant_set.g[mut_idx]])   if self.g.ndim == 2   else self.g,
+        #             'c':            np.concatenate([self.c[type_idx],     self.mutant_set.c[mut_idx]])   if self.c.ndim == 2   else self.c,
+        #             'chi':          np.concatenate([self.chi[type_idx],   self.mutant_set.chi[mut_idx]]) if self.chi.ndim == 2 else self.chi,
+        #             'J':            self.J,
+        #             'mu':           np.concatenate([self.mu[type_idx],           self.mutant_set.mu[mut_idx]]) if self.mu.ndim == 2 else self.mu,
+        #             'energy_costs': np.concatenate([self.energy_costs[type_idx], self.mutant_set.energy_costs[mut_idx]])}
+        # else:
+        #     return {'num_types':    self.num_types,
+        #             'sigma':        self.sigma,
+        #             'b':            self.b,
+        #             'k':            self.k,
+        #             'eta':          self.eta,
+        #             'l':            self.l,
+        #             'g':            self.g,
+        #             'c':            self.c,
+        #             'chi':          self.chi,
+        #             'J':            self.J,
+        #             'mu':           self.mu,
+        #             'energy_costs': self.energy_costs}
 
         # params = {'num_types':      len(type_idx),
         #             'sigma':        self.sigma[type_idx],

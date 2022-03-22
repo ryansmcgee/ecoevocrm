@@ -176,15 +176,17 @@ class ConsumerResourceSystem():
                                           else -1
 
 
-        # self.extant_mutant_set = self.type_set.generate_mutant_set()
+        self.extant_mutant_set = self.type_set.generate_mutant_set()
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def run(self, T=1000, dt=None, integration_method='default'):
+    def run(self, T=10000, dt=None, integration_method='default'):
 
         t_start   = self.t
         t_elapsed = 0
+
+        numiter = 0
 
         while(t_elapsed < T):
 
@@ -199,26 +201,30 @@ class ConsumerResourceSystem():
             t_eval = np.arange(start=t_span[0], stop=t_span[1]+dt, step=dt) if dt is not None else None,
 
             # Get the indices and count of extant types (abundance > 0):
-            extant_types     = self.get_extant_types()
-            num_extant_types = len(extant_types)
+            self.extant_type_indices     = self.get_extant_types()
+            num_extant_types = len(self.extant_type_indices)
             # print("\n\n$$$$$$$$$$$$$$$$$$$$$$$$$$")
-            # print("extant_types", extant_types, num_extant_types)
+            # print("\n\nsigma (master)\n", self.type_set.sigma)
+            # print("self.extant_type_indices", self.extant_type_indices, num_extant_types)
+            # print("sigma (extant)\n", self.type_set.sigma[self.extant_type_indices])
+            
+
 
             # Set the initial conditions for this integration epoch:
-            N_init = self.N_series[extant_types, -1] # only run dynamics for extant types
+            N_init = self.N_series[self.extant_type_indices, -1] # only run dynamics for extant types
             R_init = self.R_series[:,-1]
             cumPropMut_init = np.array([0])
             init_cond = np.concatenate([N_init, R_init, cumPropMut_init])
 
             # Get the params for the dynamics:
-            params = self.get_dynamics_params(extant_types)
+            params = self.get_dynamics_params(self.extant_type_indices)
 
             # Draw a random propensity threshold for triggering the next Gillespie mutation event:
             self.threshold_mutation_propensity = np.random.exponential(1)
 
             # Reset helper variables for storing latest attributes of mutants (as calc'ed in dynamics):
-            # self.mutant_fitnesses      = np.zeros(self.type_set.mutant_set.num_types)
-            # self.mutation_propensities = np.zeros(self.type_set.mutant_set.num_types)
+            # self.mutant_fitnesses      = np.zeros(self.extant_mutant_set.num_types)
+            # self.mutation_propensities = np.zeros(self.extant_mutant_set.num_types)
             
             # Set the integration method:
             if(integration_method == 'default'):
@@ -251,7 +257,7 @@ class ConsumerResourceSystem():
 
             # Update the system data series:
             N_epoch = np.zeros(shape=(self.type_set.num_types, len(sol.t)))
-            N_epoch[extant_types] = sol.y[:num_extant_types]
+            N_epoch[self.extant_type_indices] = sol.y[:num_extant_types]
 
             R_epoch = sol.y[-1-self.resource_set.num_resources:-1]
 
@@ -260,17 +266,17 @@ class ConsumerResourceSystem():
             # self.N_series = np.hstack([self.N_series[:,:-1], sol.y[:self.type_set.num_types]]) if self.N_series is not None else sol.y[:self.type_set.num_types]
             # self.R_series = np.hstack([self.R_series[:,:-1], sol.y[-1-self.resource_set.num_resources:-1]]) if self.R_series is not None else sol.y[-1-self.resource_set.num_resources:-1]
 
-            extant_type_mutants = self.type_set.get_mutant_indices(extant_types)
+            extant_type_mutants = self.type_set.get_mutant_indices(self.extant_type_indices)
 
-            mutant_fitnesses_fullset = np.zeros(self.type_set.mutant_set.num_types)
-            mutant_fitnesses_fullset[extant_type_mutants] = self.mutant_fitnesses
-            self.mutant_fitnesses    = mutant_fitnesses_fullset
+            # mutant_fitnesses_fullset = np.zeros(self.extant_mutant_set.num_types)
+            # mutant_fitnesses_fullset[extant_type_mutants] = self.mutant_fitnesses
+            # self.mutant_fitnesses    = mutant_fitnesses_fullset
 
-            mutation_propensities_fullset = np.zeros(self.type_set.mutant_set.num_types)
-            mutation_propensities_fullset[extant_type_mutants] = self.mutation_propensities
-            self.mutation_propensities    = mutation_propensities_fullset
+            # mutation_propensities_fullset = np.zeros(self.extant_mutant_set.num_types)
+            # mutation_propensities_fullset[extant_type_mutants] = self.mutation_propensities
+            # self.mutation_propensities    = mutation_propensities_fullset
 
-            typeCountStr = f"{num_extant_types}*({len(extant_type_mutants)})/{self.type_set.num_types}*({self.type_set.mutant_set.num_types}) {N_epoch.shape}"
+            typeCountStr = f"{num_extant_types}*({len(extant_type_mutants)}|{self.extant_mutant_set.num_types})/{self.type_set.num_types} {N_epoch.shape}"
 
             #------------------------------
             # Handle events and update the system's states accordingly:
@@ -278,6 +284,7 @@ class ConsumerResourceSystem():
             if(sol.status == 1): # An event occurred
                 if(len(sol.t_events[0]) > 0):
                     print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="")
+                    # print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]\t")
                     self.handle_mutation_event()
                     self.handle_type_loss()
                     # exit()
@@ -295,7 +302,9 @@ class ConsumerResourceSystem():
             if(total_epoch_abundance_change < self.threshold_eq_abundance_change):
                 break
 
-            # break
+            # numiter += 1
+            # if(numiter >= 1):
+            #     break
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -476,35 +485,45 @@ class ConsumerResourceSystem():
     def handle_mutation_event(self):
         # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
         mutant_drawprobs = self.mutation_propensities/np.sum(self.mutation_propensities)
-        # print(len(self.mutation_propensities), len(mutant_drawprobs))
-        # print((self.type_set.mutant_set.num_types))
-        mutant_idx       = np.random.choice(range(self.type_set.mutant_set.num_types), p=mutant_drawprobs)
+        mutant_idx       = np.random.choice(range(self.extant_mutant_set.num_types), p=mutant_drawprobs)
+        # print("\tmutant_idx", mutant_idx, self.extant_mutant_set.sigma[mutant_idx])
         # Retrieve the mutant and some of its properties:
-        mutant           = self.type_set.mutant_set.get_type(mutant_idx)
-        # print("\nmutant.b", mutant.b, mutant.b.shape)
-        # print("mutant.c", mutant.c, mutant.c.shape)
-        mutant_type_id   = self.type_set.mutant_set.get_type_id(mutant_idx)
+        mutant           = self.extant_mutant_set.get_type(mutant_idx)
+        mutant_type_id   = self.extant_mutant_set.get_type_id(mutant_idx)
         mutant_fitness   = self.mutant_fitnesses[mutant_idx]
         mutant_abundance = np.maximum(1/mutant_fitness, 1) # forcing abundance of new types to be at least 1, this is a Ryan addition (perhaps controversial)
         # Get the index of the parent of the selected mutant:
-        parent_idx       = mutant_idx // self.type_set.num_traits
-        # print("\nmutation @ parent_idx", parent_idx)
+        parent_idx       = self.extant_type_indices[ mutant_idx // self.type_set.num_traits ]
+        # print("\tparent_idx", parent_idx, self.type_set.sigma[parent_idx])
         #----------------------------------
         if(mutant_type_id in self.type_set.type_ids):
-            # print("pre-existing")
+            # print("mutation: pre-existing")
             # This "mutant" is a pre-existing type in the population; get its index:
             preexisting_type_idx = np.where(np.array(self.type_set.type_ids) == mutant_type_id)[0][0]
+            # print("\tpreexisting_type_idx", preexisting_type_idx, self.type_set.sigma[preexisting_type_idx])
             # Add abundance equal to the mutant's establishment abundance to the pre-existing type:
             self.set_type_abundance(type_index=preexisting_type_idx, abundance=self.get_type_abundance(preexisting_type_idx)+mutant_abundance)
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=self.get_type_abundance(parent_idx)-mutant_abundance)
+
+            if(preexisting_type_idx not in self.extant_type_indices):
+                # print("\t> was non-extant, add to mutant set")
+                # print("\t......", np.argmax(self.extant_type_indices > preexisting_type_idx), np.argmax(self.extant_type_indices > preexisting_type_idx)*self.type_set.num_traits)
+                # print("\textant_mutant_set idx", np.argmax(self.extant_type_indices > preexisting_type_idx)*self.type_set.num_traits)
+                self.extant_mutant_set.add_type(mutant.generate_mutant_set(), index=np.argmax(self.extant_type_indices > preexisting_type_idx)*self.type_set.num_traits)
+
+
         else:
-            # print("new type")
+            # print("mutation: new type, add to mutant set")
             # Add the mutant to the population at an establishment abundance equal to 1/dfitness:
             #  (type set costs, phylogeny, and mutant set get updated as result of add_type())
             self.add_type(mutant, abundance=mutant_abundance, index=parent_idx+1, parent_index=parent_idx)  
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=self.get_type_abundance(parent_idx)-mutant_abundance)
+
+            # print("\textant_mutant_set idx", ((mutant_idx//self.type_set.num_traits)+1)*self.type_set.num_traits)
+            self.extant_mutant_set.add_type(mutant.generate_mutant_set(), index=((mutant_idx//self.type_set.num_traits)+1)*self.type_set.num_traits)
+            
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -609,10 +628,24 @@ class ConsumerResourceSystem():
         #----------------------------------
         lost_types = np.where( (N > 0) & (growth_rate < 0) & ((N < self.threshold_min_abs_abundance) | (N/np.sum(N) < self.threshold_min_rel_abundance)) )[0]
         # print(( (N > 0) & (growth_rate < 0) & ((N < self.threshold_min_abs_abundance) | (N/np.sum(N) < self.threshold_min_rel_abundance)) ))
-        # print(lost_types)
+        
+        # print("handle_type_loss")
+
+        # print("\t> N:", N)
+
+        self.extant_type_indices = self.get_extant_types()
+        # print("\t> extant_type_indices", self.extant_type_indices)
+
+        # print("\t> lost_types", lost_types)
         for i in lost_types:
-            # print("removing", i)
             self.set_type_abundance(type_index=i, abundance=0.0) # Set the abundance of lost types to 0 (but do not remove from system/type set data)
+
+        
+
+        if(len(lost_types)>0):
+            # print("\t> remove", self.type_set.get_mutant_indices(np.where(np.in1d(self.extant_type_indices, lost_types))[0]))
+            self.extant_mutant_set.remove_type(self.type_set.get_mutant_indices(np.where(np.in1d(self.extant_type_indices, lost_types))[0]))
+            # exit()
         #----------------------------------
         return
 
@@ -671,37 +704,81 @@ class ConsumerResourceSystem():
     # def generate_mutant_set(self, parent_set=None):
     #     parent_set = self.type_set if parent_set is None else parent_set
     #     #----------------------------------
-    #     # now in typeset self.type_set.mutant_set = self.type_set.generate_mutant_set()
+    #     # now in typeset self.extant_mutant_set = self.type_set.generate_mutant_set()
     #     #----------------------------------
     #     # In the case of 'fast resource equilibriation' resource consumption dyanmics,
     #     # growth rates depend on the abundances of types in the population, and thus
     #     # calculating mutant fitnesses requires abundance/parameter information about 
     #     # parent types to be included when calculating mutant growth rates.
     #     # if(self.resource_consumption_mode=='fast_resource_eq'):
-    #     #     self.type_set.mutant_set.add_type(self.type_set)
+    #     #     self.extant_mutant_set.add_type(self.type_set)
     #     # Store the number of actual mutant types in this set so we can later reference values for only mutant types
-    #     self.type_set.mutant_set.num_types = self.type_set.mutant_set.num_types #if self.resource_consumption_mode != 'fast_resource_eq' else self.type_set.mutant_set.num_types - parent_set.num_types
+    #     self.extant_mutant_set.num_types = self.extant_mutant_set.num_types #if self.resource_consumption_mode != 'fast_resource_eq' else self.extant_mutant_set.num_types - parent_set.num_types
     #     #----------------------------------
-    #     return self.type_set.mutant_set
+    #     return self.extant_mutant_set
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_dynamics_params(self, type_indices=None):
 
-        mutant_indices = self.type_set.get_mutant_indices(type_indices)
+        # print("get_dynamics_params()")
 
-        type_params_wmuts = self.type_set.get_dynamics_params(type_indices, include_mutants=True)
-        resource_params   = self.resource_set.get_dynamics_params()
+        # dynamics() expects args: 
+        #     num_types, num_mutants, sigma, b, k, eta, l, g, c, chi, J, mu, energy_costs, energy_uptake_coeffs,
+        #     num_resources, rho, tau, omega, D, 
+        #     resource_consumption_mode, resource_inflow_mode
 
-        energy_uptake_coeffs = self.resource_set.omega * (1-type_params_wmuts['l']) * type_params_wmuts['sigma'] * type_params_wmuts['b']
+        # print("type_indices", type_indices)
+
+        extant_type_params   = self.type_set.get_dynamics_params(type_indices)
+        extant_mutant_params = self.extant_mutant_set.get_dynamics_params()
+        resource_params      = self.resource_set.get_dynamics_params()
+
+        # print("extant_type_params.sigma", extant_type_params['sigma'].shape)
+        # print("extant_mutant_params.sigma", extant_mutant_params['sigma'].shape)
+
+        type_params_wmuts = {
+                              'num_types':    extant_type_params['num_types'], 
+                              'num_mutants':  extant_mutant_params['num_types'],
+                              'sigma':        np.concatenate([extant_type_params['sigma'], extant_mutant_params['sigma']]),
+                              'b':            extant_type_params['b'] if extant_type_params['b'].ndim < 2 else np.concatenate([extant_type_params['b'], extant_mutant_params['b']]),
+                              'k':            extant_type_params['k'] if extant_type_params['k'].ndim < 2 else np.concatenate([extant_type_params['k'], extant_mutant_params['k']]),
+                              'eta':          extant_type_params['eta'] if extant_type_params['eta'].ndim < 2 else np.concatenate([extant_type_params['eta'], extant_mutant_params['eta']]),
+                              'g':            extant_type_params['g'] if extant_type_params['g'].ndim < 2 else np.concatenate([extant_type_params['g'], extant_mutant_params['g']]),
+                              'c':            extant_type_params['c'] if extant_type_params['c'].ndim < 2 else np.concatenate([extant_type_params['c'], extant_mutant_params['c']]),
+                              'l':            extant_type_params['l'] if extant_type_params['l'].ndim < 2 else np.concatenate([extant_type_params['l'], extant_mutant_params['l']]),
+                              'chi':          extant_type_params['chi'] if extant_type_params['chi'].ndim < 2 else np.concatenate([extant_type_params['chi'], extant_mutant_params['chi']]),
+                              'J':            extant_type_params['J'],
+                              'mu':           extant_type_params['mu'] if extant_type_params['mu'].ndim < 2 else np.concatenate([extant_type_params['mu'], extant_mutant_params['mu']]),
+                              'energy_costs': np.concatenate([extant_type_params['energy_costs'], extant_mutant_params['energy_costs']]) 
+                            }
+
+        energy_uptake_coeffs = resource_params['omega'] * (1-type_params_wmuts['l']) * type_params_wmuts['sigma'] * type_params_wmuts['b']
+
+        # print("energy_uptake_coeffs", energy_uptake_coeffs.shape)
 
         return (tuple(type_params_wmuts.values()) + (energy_uptake_coeffs,)
                 + tuple(resource_params.values())
                 + (self.resource_consumption_mode, self.resource_inflow_mode))
+
+        #----------------------------------
+
+        # mutant_indices = self.type_set.get_mutant_indices(type_indices)
+
+        # type_params_wmuts = self.type_set.get_dynamics_params(type_indices, include_mutants=True)
+        # resource_params   = self.resource_set.get_dynamics_params()
+
+        # energy_uptake_coeffs = self.resource_set.omega * (1-type_params_wmuts['l']) * type_params_wmuts['sigma'] * type_params_wmuts['b']
+
+        # return (tuple(type_params_wmuts.values()) + (energy_uptake_coeffs,)
+        #         + tuple(resource_params.values())
+        #         + (self.resource_consumption_mode, self.resource_inflow_mode))
+
+        #----------------------------------
         
 
         # extant_type_params   = self.type_set.get_dynamics_params(type_indices)
-        # extant_mutant_params = self.type_set.mutant_set.get_dynamics_params(mutant_indices)
+        # extant_mutant_params = self.extant_mutant_set.get_dynamics_params(mutant_indices)
         # resource_params      = self.resource_set.get_dynamics_params()
 
         # extant_type_params.update({'energy_uptake_coeffs': self.resource_set.omega * (1-extant_type_params['l']) * extant_type_params['sigma'] * extant_type_params['b']})
@@ -831,7 +908,7 @@ class ConsumerResourceSystem():
 
     # @staticmethod
     # def mutation_propensities(N, R, mu=None, mutant_set=None, parent_set=None, resource_set=None):
-    #     mutant_set  = self.type_set.mutant_set if mutant_set is None else mutant_set
+    #     mutant_set  = self.extant_mutant_set if mutant_set is None else mutant_set
     #     parent_set  = self.type_set if parent_set is None else parent_set
     #     resource_set = self.resource_set if resource_set is None else resource_set
     #     #----------------------------------
