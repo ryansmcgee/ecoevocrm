@@ -84,7 +84,7 @@ def stacked_abundance_plot(system, ax=None, type_colors=None,
     
     ax = plt.axes() if ax is None else ax
 
-    ax.stackplot(system.t_series, np.flip(system.N_series, axis=0), baseline='sym', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+    ax.stackplot(system.t_series[:system.t_idx], np.flip(system.N_series[:, :system.t_idx], axis=0), baseline='sym', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
 
     return ax
 

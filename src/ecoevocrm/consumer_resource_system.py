@@ -153,6 +153,7 @@ class ConsumerResourceSystem():
         #----------------------------------
         self.t = 0
         self.t_series = np.array([0])
+        self.t_idx = 0
 
         #----------------------------------
         # Initialize event parameters:
@@ -181,10 +182,18 @@ class ConsumerResourceSystem():
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def run(self, T=10000, dt=None, integration_method='default'):
+    def run(self, T=1e4, dt=None, integration_method='default'):
 
         t_start   = self.t
         t_elapsed = 0
+
+        # print(self.N_series, self.N_series.shape)
+
+        # print( np.zeros(shape=(self.N_series.shape[0], int(T/dt if dt is not None else T/0.1))) )
+
+        # self.t_series = np.hstack([self.t_series[:,:self.t_idx+1], np.zeros(shape=(self.t_series.shape[0], int(T/dt if dt is not None else T/0.1)))]) 
+        # self.N_series = np.hstack([self.N_series[:,:self.t_idx+1], np.zeros(shape=(self.N_series.shape[0], int(T/dt if dt is not None else T/0.1)))]) 
+        # self.R_series = np.hstack([self.R_series[:,:self.t_idx+1], np.zeros(shape=(self.R_series.shape[0], int(T/dt if dt is not None else T/0.1)))])
 
         numiter = 0
 
@@ -211,8 +220,8 @@ class ConsumerResourceSystem():
 
 
             # Set the initial conditions for this integration epoch:
-            N_init = self.N_series[self.extant_type_indices, -1] # only run dynamics for extant types
-            R_init = self.R_series[:,-1]
+            N_init = self.N()[self.extant_type_indices] # self.N_series[self.extant_type_indices, -1] # only run dynamics for extant types
+            R_init = self.R() # self.R_series[:,-1]
             cumPropMut_init = np.array([0])
             init_cond = np.concatenate([N_init, R_init, cumPropMut_init])
 
@@ -250,23 +259,42 @@ class ConsumerResourceSystem():
             # Update the system's trajectories with latest dynamics epoch:
             #------------------------------
 
-            # Update the system time series:
-            self.t_series = np.concatenate([self.t_series[:-1], sol.t]) if self.t_series is not None else sol.t
-            self.t = self.t_series[-1] + (dt if dt is not None else 0)
-            t_elapsed = self.t - t_start
+            # print(f"{self.t_idx} ({self.t_series[self.t_idx]}) -> {self.t_idx+len(sol.t)}")
+
+            # Expand the data structures if necessary:
+            if(len(sol.t) > len(self.t_series) - self.t_idx):
+                self.t_series = np.hstack([self.t_series[:self.t_idx+1],   np.zeros(shape=(int(T/dt if dt is not None else T/0.1)))]) 
+                self.N_series = np.hstack([self.N_series[:,:self.t_idx+1], np.zeros(shape=(self.N_series.shape[0], int(T/dt if dt is not None else T/0.1)))]) 
+                self.R_series = np.hstack([self.R_series[:,:self.t_idx+1], np.zeros(shape=(self.R_series.shape[0], int(T/dt if dt is not None else T/0.1)))])
 
             # Update the system data series:
-            N_epoch = np.zeros(shape=(self.type_set.num_types, len(sol.t)))
-            N_epoch[self.extant_type_indices] = sol.y[:num_extant_types]
+            
+            # N_epoch = np.zeros(shape=(self.type_set.num_types, len(sol.t)))
+            # N_epoch[self.extant_type_indices] = sol.y[:num_extant_types]
+            # self.N_series = np.hstack([self.N_series[:,:-1], N_epoch]) if self.N_series is not None else N_epoch
+            self.N_series[self.extant_type_indices, self.t_idx+1:self.t_idx+1+len(sol.t)] = sol.y[:num_extant_types]
 
-            R_epoch = sol.y[-1-self.resource_set.num_resources:-1]
-
-            self.N_series = np.hstack([self.N_series[:,:-1], N_epoch]) if self.N_series is not None else N_epoch
-            self.R_series = np.hstack([self.R_series[:,:-1], R_epoch]) if self.R_series is not None else R_epoch
+            # R_epoch = sol.y[-1-self.resource_set.num_resources:-1]
+            # self.R_series = np.hstack([self.R_series[:,:-1], R_epoch]) if self.R_series is not None else R_epoch
+            self.R_series[:, self.t_idx+1:self.t_idx+1+len(sol.t)] = sol.y[-1-self.resource_set.num_resources:-1]
+            
             # self.N_series = np.hstack([self.N_series[:,:-1], sol.y[:self.type_set.num_types]]) if self.N_series is not None else sol.y[:self.type_set.num_types]
             # self.R_series = np.hstack([self.R_series[:,:-1], sol.y[-1-self.resource_set.num_resources:-1]]) if self.R_series is not None else sol.y[-1-self.resource_set.num_resources:-1]
 
-            extant_type_mutants = self.type_set.get_mutant_indices(self.extant_type_indices)
+            # Update the system time series:
+            
+            # self.t_series = np.concatenate([self.t_series[:-1], sol.t]) if self.t_series is not None else sol.t
+            self.t_series[self.t_idx+1:self.t_idx+1+len(sol.t)] = sol.t
+            self.t_idx = self.t_idx + len(sol.t)
+            self.t = self.t_series[self.t_idx] + (dt if dt is not None else 0)
+            t_elapsed = self.t - t_start
+
+
+
+
+
+
+            # extant_type_mutants = self.type_set.get_mutant_indices(self.extant_type_indices)
 
             # mutant_fitnesses_fullset = np.zeros(self.extant_mutant_set.num_types)
             # mutant_fitnesses_fullset[extant_type_mutants] = self.mutant_fitnesses
@@ -276,7 +304,7 @@ class ConsumerResourceSystem():
             # mutation_propensities_fullset[extant_type_mutants] = self.mutation_propensities
             # self.mutation_propensities    = mutation_propensities_fullset
 
-            typeCountStr = f"{num_extant_types}*({len(extant_type_mutants)}|{self.extant_mutant_set.num_types})/{self.type_set.num_types} {N_epoch.shape}"
+            typeCountStr = f"{num_extant_types}*({self.extant_mutant_set.num_types})/{self.type_set.num_types}"
 
             #------------------------------
             # Handle events and update the system's states accordingly:
@@ -298,13 +326,35 @@ class ConsumerResourceSystem():
             else: # Error occurred in integration
                 utils.error("Error in ConsumerResourceSystem run(): Integration of dynamics using scipy.solve_ivp returned with error status.")
             
-            total_epoch_abundance_change = np.sum( self.N_series[:,-1] - self.N_series[:,0] )
-            if(total_epoch_abundance_change < self.threshold_eq_abundance_change):
-                break
+            # print("sol.t", sol.t)
+            # print("sol.y_N", sol.y[:num_extant_types])
+            # print("sol.y_R", sol.y[-1-self.resource_set.num_resources:-1])
+
+            # print("t_series:", self.t_series, self.t_series.shape)
+            # print("N_series:", self.N_series, self.N_series.shape)
+            # print("R_series:", self.R_series, self.R_series.shape)
+
+            # print("t:", self.t)
+            # print("N():", self.N())
+            # print("R():", self.R())
+
+            # exit()
+
+            # print(self.N())
+            # print(self.N(0))
+            # print(self.N() - self.N(0))
+            # total_epoch_abundance_change = np.sum( self.N() - self.N(0) )
+            # if(total_epoch_abundance_change < self.threshold_eq_abundance_change):
+            #     print("[ total_epoch_abundance_change < self.threshold_eq_abundance_change ]")
+            #     break
 
             # numiter += 1
             # if(numiter >= 1):
             #     break
+
+        self.t_series = self.t_series[:self.t_idx+1]
+        self.N_series = self.N_series[:, :self.t_idx+1]
+        self.R_series = self.R_series[:, :self.t_idx+1]
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -349,18 +399,17 @@ class ConsumerResourceSystem():
     #     return ConsumerResourceSystem.growth_rate(self.N(t), self.R(t), self.type_set.sigma, self.type_set.b, self.type_set.k, self.type_set.eta, self.type_set.l, self.type_set.g, self.type_set.energy_costs, self.resource_set.omega, self.resource_consumption_mode)
 
 
-    def N(self, t=None, type_index=None, type_id=None):
+    def N(self, t=None, t_index=None, type_index=None, type_id=None):
         # TODO: allow for passing in single or series of t vals:
-        # TODO: handle type_index and type_id
-        if (t is None):
-            return self.N_series[:, -1]
+        t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else self.t_idx
+        return self.N_series[:, t_idx].ravel()
 
 
-    def R(self, t=None, resource_index=None, resource_id=None):
+    def R(self, t=None, t_index=None, resource_index=None, resource_id=None):
         # TODO: allow for passing in single or series of t vals:
         # TODO: handle resource_index and resource_id
-        if (t is None):
-            return self.R_series[:, -1]
+        t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else self.t_idx
+        return self.R_series[:, t_idx].ravel()
 
 
 
@@ -492,6 +541,7 @@ class ConsumerResourceSystem():
         mutant_type_id   = self.extant_mutant_set.get_type_id(mutant_idx)
         mutant_fitness   = self.mutant_fitnesses[mutant_idx]
         mutant_abundance = np.maximum(1/mutant_fitness, 1) # forcing abundance of new types to be at least 1, this is a Ryan addition (perhaps controversial)
+        # print("mutant_abundance", mutant_abundance)
         # Get the index of the parent of the selected mutant:
         parent_idx       = self.extant_type_indices[ mutant_idx // self.type_set.num_traits ]
         # print("\tparent_idx", parent_idx, self.type_set.sigma[parent_idx])
@@ -622,8 +672,10 @@ class ConsumerResourceSystem():
 
     def handle_type_loss(self):
         # print("handle_type_loss")
-        N = self.N_series[:,-1].ravel()
-        R = self.R_series[:,-1].ravel()
+        # N = self.N_series[:,-1].ravel()
+        # R = self.R_series[:,-1].ravel()
+        N = self.N()
+        R = self.R()
         growth_rate = ConsumerResourceSystem.growth_rate(N, R, self.type_set.sigma, self.type_set.b, self.type_set.k, self.type_set.eta, self.type_set.l, self.type_set.g, self.type_set.energy_costs, self.resource_set.omega, self.resource_consumption_mode) 
         #----------------------------------
         lost_types = np.where( (N > 0) & (growth_rate < 0) & ((N < self.threshold_min_abs_abundance) | (N/np.sum(N) < self.threshold_min_rel_abundance)) )[0]
@@ -668,19 +720,21 @@ class ConsumerResourceSystem():
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def set_type_abundance(self, abundance, type_index=None, type_id=None, t_index=-1):
+    def set_type_abundance(self, abundance, type_index=None, type_id=None, t=None, t_index=None):
         abundance    = utils.treat_as_list(abundance)
         type_indices = [ np.where(self.type_set.type_ids==tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index)
+        t_idx        = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else self.t_idx
         #----------------------------------
         for i, type_idx in enumerate(type_indices):
-            self.N_series[type_idx, t_index] = abundance[i]
+            # print(f"set_type_abundance [{type_idx}, {t_idx}] {self.N_series[type_idx, t_idx]} -> {abundance[i]}")
+            self.N_series[type_idx, t_idx] = abundance[i]
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_type_abundance(self, type_index=None, type_id=None, t=None, t_index=None):
         type_indices = [ np.where(self.type_set.type_ids == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [ np.where(self.t_series == t_)[0] for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1 
+        time_indices = [ np.where(self.t_series == t_)[0] for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else self.t_idx
         #----------------------------------
         abundances = self.N_series[type_indices, time_indices]
         return abundances if len(type_indices) > 1 else abundances[0]
@@ -688,8 +742,8 @@ class ConsumerResourceSystem():
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_extant_types(self):
-        return np.where(self.N_series[:,-1] > 0)[0]
+    def get_extant_types(self, t=None, t_index=None):
+        return np.where(self.N(t, t_index) > 0)[0]
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
