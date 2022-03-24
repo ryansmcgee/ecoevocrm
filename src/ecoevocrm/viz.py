@@ -16,7 +16,8 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', appl
     # TODO: Make the range of random updates to child color based on phenotype or fitness difference between parent and child
 
     num_palette_types = 0
-    for lineage_id in type_set.lineage_ids:
+    lineage_ids = np.asarray(type_set.lineage_ids)
+    for lineage_id in lineage_ids:
         if(lineage_id.count('.') == apply_palette_depth):
             num_palette_types += 1
 
@@ -31,7 +32,12 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', appl
             return
         parent_color_rgb   = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4)) if ('#' in parent_color and len(parent_color)==7) else parent_color
         for lineage_id, descendants in d.items():
-            type_idx       = np.where(type_set.lineage_ids == lineage_id)[0][0]
+            # print("lineage_id", lineage_id, "descendants:", descendants)
+            # print("lineage_ids", lineage_ids)
+            # print("type_idx argmax", np.argmax(np.array(lineage_ids) == lineage_id))
+            # print("type_idx where", np.where(np.array(lineage_ids) == lineage_id))
+            # type_idx       = np.where(lineage_ids == lineage_id)[0][0]
+            type_idx       = np.argmax(lineage_ids == lineage_id)
             if(depth == apply_palette_depth):
                 type_color = palette[next_palette_color_idx]
                 next_palette_color_idx += 1
@@ -84,7 +90,7 @@ def stacked_abundance_plot(system, ax=None, type_colors=None,
     
     ax = plt.axes() if ax is None else ax
 
-    ax.stackplot(system.t_series[:system.t_idx], np.flip(system.N_series[:, :system.t_idx], axis=0), baseline='sym', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+    ax.stackplot(system.t_series, np.flip(system.N_series, axis=0), baseline='sym', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
 
     return ax
 
