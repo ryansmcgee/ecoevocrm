@@ -19,11 +19,7 @@ class TypeSet():
                        chi            = None,
                        J              = None,
                        mu             = 0,
-                       lineage_ids    = None,
-                       # has_type_ids   = True,
-                       # has_phylogeny  = True,
-                       # has_mutant_set = True 
-                       ):
+                       lineage_ids    = None ):
 
         #----------------------------------
         # Determine the number of types and traits,
@@ -63,47 +59,21 @@ class TypeSet():
 
         self._J     = utils.reshape(J, shape=(self.num_traits, self.num_traits)) if J is not None else None
 
-        # Calculate initial (biochem independent) phenotypic costs:
-        # self.update_phenotypic_costs()
-        self._energy_costs = None # doing this as a property means it only gets computed on demand, not every time a TypeSet is instantiated
+        #----------------------------------
+        # Initialize other type properties/metadata:
+        #----------------------------------
 
-        # # Assign unique ids to each type (determined by hash of all param values):
-        # self.type_ids = np.array([self.get_type_id(i) for i in range(self.num_types)]) if has_type_ids else None
-        self._type_ids = None # doing this as a property means it only gets computed on demand, not every time a TypeSet is instantiated
+        self._energy_costs = None 
 
-        # self._parent_indices = utils.ExpandableArray([None for i in range(self.num_types)])
+        self._type_ids = None
+
         self._parent_indices = [None for i in range(self.num_types)]
-        # self.parent_indices = np.array([None for i in range(self.num_types)])
-
-        # self._lineage_ids = utils.ExpandableArray(lineage_ids, dtype='U') if lineage_ids is not None else None # None, or provided to constructor
-        self._lineage_ids = lineage_ids if lineage_ids is not None else None # None, or provided to constructor
-        # self.lineage_ids  = (np.array([None for i in range(self.num_types)] if lineage_ids is None else lineage_ids)) if has_phylogeny else None
-
-        self.phylogeny = {}
-
-        # self.phylogeny      = {} if has_phylogeny else None
-        # if(has_phylogeny):
-        #     for i in range(self.num_types):
-        #         new_lineage_id = self.add_type_to_phylogeny(i)
-        #         self.lineage_ids[i] = new_lineage_id
-
-
-        # self.mutant_indices = utils.ExpandableArray(np.arange(0, self.num_traits), dtype='int')
 
         self._mutant_indices = None
 
-
-    
-
-
-
-
-
-    # [X] energy_costs
-    #     type_ids
-    #     parent indices
-    #     lineage_ids
-    #     phylogeny_dict
+        self._lineage_ids = lineage_ids if lineage_ids is not None else None
+        
+        self.phylogeny = {}
                 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -115,10 +85,6 @@ class TypeSet():
     @property
     def num_types(self):
         return self.sigma.shape[0]
-
-    # @property
-    # def num_traits(self):
-    #     return self.sigma.shape[1]
     
     @property
     def sigma(self):
@@ -174,14 +140,11 @@ class TypeSet():
     @property
     def type_ids(self):
         if(self._type_ids is None):
-            # self._type_ids = utils.ExpandableArray([self.get_type_id(i) for i in range(self.num_types)]) 
             self._type_ids = [self.get_type_id(i) for i in range(self.num_types)]
-        # return TypeSet.get_array(self._type_ids).ravel()
         return self._type_ids
 
     @property
     def parent_indices(self):
-        # return TypeSet.get_array(self._parent_indices).ravel()
         return self._parent_indices
 
     @property
@@ -192,19 +155,13 @@ class TypeSet():
 
     @property
     def lineage_ids(self):
-        # print("@ lineage_ids")
-        # print("parent_indices", self.parent_indices)
         if(self._lineage_ids is None):
             self.phylogeny = {}
             lineage_ids = []
             for i in range(self.num_types):
-                # print("@ >>> add_type_to_phylogeny")
                 new_lineage_id = self.add_type_to_phylogeny(i)
                 lineage_ids.append(new_lineage_id)
-            # self._lineage_ids = utils.ExpandableArray(lineage_ids, dtype=np.string_)
             self._lineage_ids = lineage_ids
-        # print("lineage_ids post", TypeSet.get_array(self._lineage_ids).ravel())
-        # return TypeSet.get_array(self._lineage_ids).ravel()
         return self._lineage_ids
 
     
@@ -250,19 +207,6 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # def update_phenotypic_costs(self): #, sigma=None, c=None, chi=None, J=None):
-    #     costs = 0 + (self.c.ravel() if self.c.ndim == 2 else self.c)
-    #     if(self.chi is not None):
-    #         costs += np.sum(self.sigma * self.chi, axis=1)
-    #     if(self.J is not None):
-    #         costs += -1 * np.sum(self.sigma * np.dot(self.sigma, self.J), axis=1)
-    #     #----------------------------------
-    #     self.energy_costs = costs
-    #     return self.energy_costs
-
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     def generate_mutant_phenotypes(self, sigma=None):
         sigma = self.sigma if sigma is None else sigma
         #----------------------------------
@@ -274,8 +218,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def generate_mutant_set(self): # , has_phylogeny=False): # sigma=None, J=None, has_type_ids=False,
-        # print("generate_mutant_set")
+    def generate_mutant_set(self):
         sigma_mut = self.generate_mutant_phenotypes()
         #---------------------------------- 
         b_mut     = np.repeat(self.b, repeats=self.sigma.shape[1], axis=0)   if self.b.ndim == 2   else self.b
@@ -287,8 +230,7 @@ class TypeSet():
         chi_mut   = np.repeat(self.chi, repeats=self.sigma.shape[1], axis=0) if self.chi.ndim == 2 else self.chi
         mu_mut    = np.repeat(self.mu, repeats=self.sigma.shape[1], axis=0)  if self.mu.ndim == 2  else self.mu
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, c=c_mut, chi=chi_mut, J=self.J, mu=mu_mut) 
-                             # has_phylogeny=has_phylogeny, has_type_ids=has_type_ids, has_mutant_set=False
+        mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, c=c_mut, chi=chi_mut, J=self.J, mu=mu_mut)
         #----------------------------------
         return mutant_set
 
@@ -296,8 +238,6 @@ class TypeSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def add_type(self, type_set=None, sigma=None, b=None, k=None, eta=None, l=None, g=None, c=None, chi=None, mu=None, parent_index=None, parent_id=None, ref_type_idx=None): # index=None, 
-        # print(f"\nTypeSet add_type (parent {parent_index, parent_id})")
-        # new_type_idx = index if index is not None else self.num_types # default to adding to end of matrices
         parent_idx   = np.where(self.type_ids==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
@@ -316,13 +256,12 @@ class TypeSet():
                                          c=c if c is not None else self.c[ref_type_idx],  
                                          chi=chi if chi is not None else self.chi[ref_type_idx],  
                                          mu=mu if mu is not None else self.mu[ref_type_idx]
-                                         ) # has_mutant_set=False, has_type_ids=False)
+                                         )
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != new_type_set.num_traits): 
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({new_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
         #----------------------------------
-        self._sigma.add(new_type_set.sigma)
-        
+        self._sigma = self._sigma.add(new_type_set.sigma)
         self._b     = self._b.add(new_type_set.b)     if isinstance(self._b,   utils.ExpandableArray) else self._b
         self._k     = self._k.add(new_type_set.k)     if isinstance(self._k,   utils.ExpandableArray) else self._k
         self._eta   = self._eta.add(new_type_set.eta) if isinstance(self._eta, utils.ExpandableArray) else self._eta
@@ -331,72 +270,37 @@ class TypeSet():
         self._c     = self._c.add(new_type_set.c)     if isinstance(self._c,   utils.ExpandableArray) else self._c
         self._chi   = self._chi.add(new_type_set.chi) if isinstance(self._chi, utils.ExpandableArray) else self._chi
         self._mu    = self._mu.add(new_type_set.mu)   if isinstance(self._mu,  utils.ExpandableArray) else self._mu
-        
-        # self.sigma = np.insert(self.sigma, new_type_idx, new_type_set.sigma, axis=0)
-        # self.b     = np.insert(self.b,   new_type_idx, new_type_set.b,   axis=0) if self.b.ndim == 2   else self.b
-        # self.k     = np.insert(self.k,   new_type_idx, new_type_set.k,   axis=0) if self.k.ndim == 2   else self.k
-        # self.eta   = np.insert(self.eta, new_type_idx, new_type_set.eta, axis=0) if self.eta.ndim == 2 else self.eta
-        # self.l     = np.insert(self.l,   new_type_idx, new_type_set.l,   axis=0) if self.l.ndim == 2   else self.l
-        # self.g     = np.insert(self.g,   new_type_idx, new_type_set.g,   axis=0) if self.g.ndim == 2   else self.g
-        # self.c     = np.insert(self.c,   new_type_idx, new_type_set.c,   axis=0) if self.c.ndim == 2   else self.c
-        # self.mu    = np.insert(self.mu,  new_type_idx, new_type_set.mu,  axis=0) if self.mu.ndim == 2  else self.mu
-        # self.chi   = np.insert(self.chi, new_type_idx, new_type_set.chi, axis=0) if self.chi.ndim == 2 else self.chi
-
         #----------------------------------
-        # print("parent_index", parent_index)
-        # print("parent_indices pre", self.parent_indices)
         self._parent_indices.append(parent_index) # TODO: this does not work with lists of parent indexes
-        # print("parent_indices pst", self.parent_indices)
         #----------------------------------
         if(self._mutant_indices is not None):
             self._mutant_indices.add(np.arange((self.num_types-1)*self.num_traits, (self.num_types)*self.num_traits))
         #----------------------------------
         if(self._energy_costs is not None):
             self._energy_costs.add(new_type_set.energy_costs)
-        # self.energy_costs = np.insert(self.energy_costs, new_type_idx, new_type_set.energy_costs)
         #----------------------------------
         if(self._type_ids is not None):
             self._type_ids.extend(new_type_set.type_ids)
-        # self.type_ids = np.insert(self.type_ids, new_type_idx, new_type_set.type_ids)
         #----------------------------------
         if(self._lineage_ids is not None):
-            # print("add_type > lineage stuff")
             for i in range((self.num_types-1), (self.num_types-1)+new_type_set.num_types):
-                # print("a >>> add_type_to_phylogeny")
-                new_lineage_id = self.add_type_to_phylogeny(i) # if self._parent_indices is updated correctly above sthen this is fine >>> # are you sure you don't need to pass parent index here?
-                # print("new_lineage_id", new_lineage_id)
-                # self._lineage_ids.add(new_lineage_id)
+                new_lineage_id = self.add_type_to_phylogeny(i)
                 self._lineage_ids.append(new_lineage_id)
-                # print("self._lineage_ids", self._lineage_ids)
-            # print(">>> phylogeny", self.phylogeny)
-        # if(self.phylogeny is not None):
-        #     for i in range(new_type_idx, new_type_idx+new_type_set.num_types):
-        #         new_lineage_id = self.add_type_to_phylogeny(i, parent_idx, parent_id)
-        #         self._lineage_ids.add(new_type_set.lineage_ids)
-        #         # self.lineage_ids    = np.insert(self.lineage_ids, i, new_lineage_id)
-        #         # self.parent_indices = np.insert(self.parent_indices, i, parent_idx)
         #----------------------------------
-        # self.num_types = self.sigma.shape[0]
+        return
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def add_type_to_phylogeny(self, index=None, type_id=None, parent_index=None, parent_id=None):
-        # print("add_type_to_phylogeny")
         type_idx   = np.where(np.in1d(self.type_ids, utils.treat_as_list(type_id))) if type_id is not None else index
-        # print("type_idx", type_idx)
         parent_idx = np.where(self.type_ids==parent_id)[0] if parent_id is not None else self.parent_indices[type_idx]
-        # print("parent_idx", parent_idx)
         #----------------------------------
         if(parent_idx is None or np.isnan(parent_idx)):
-            # print("parent_idx is None")
             new_lineage_id = str( len(self.phylogeny.keys())+1 )
-            # print("new_lineage_id", new_lineage_id)
             self.phylogeny.update({ new_lineage_id: {} })
         else:
-            # print("parent_idx exists")
             parent_lineage_id = self.lineage_ids[parent_idx.astype(int)]
-            # print("parent_lineage_id", parent_lineage_id)
             if('.' in parent_lineage_id):
                 parent_lineage_id_parts = parent_lineage_id.split('.')
                 lineageSubtree = self.phylogeny
@@ -404,9 +308,7 @@ class TypeSet():
                     lineageSubtree = lineageSubtree['.'.join(parent_lineage_id_parts[:l])]
             else:
                 lineageSubtree = self.phylogeny[parent_lineage_id]
-            # print("lineageSubtree", lineageSubtree)
             new_lineage_id = parent_lineage_id +'.'+ str(len(lineageSubtree.keys())+1)
-            # print("new_lineage_id", new_lineage_id)
             lineageSubtree[new_lineage_id] = {}
         #----------------------------------
         return new_lineage_id
@@ -414,39 +316,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # def remove_type(self, index=None, type_id=None):
-    #     type_idx = np.where(np.in1d(self.type_ids, utils.treat_as_list(type_id))) if type_id is not None else index
-    #     if(type_idx is None):
-    #         type_idx = np.arange(0, self.num_types, 1)
-    #     #----------------------------------
-    #     keep_mask = np.ones(self.num_types, dtype=bool)
-    #     keep_mask[type_idx] = False
-    #     #----------------------------------
-    #     self.sigma = self.sigma[keep_mask]
-    #     self.b     = self.b[keep_mask]   if self.b.ndim == 2   else self.b
-    #     self.k     = self.k[keep_mask]   if self.k.ndim == 2   else self.k
-    #     self.eta   = self.eta[keep_mask] if self.eta.ndim == 2 else self.eta
-    #     self.l     = self.l[keep_mask]   if self.l.ndim == 2   else self.l
-    #     self.g     = self.g[keep_mask]   if self.g.ndim == 2   else self.g
-    #     self.c     = self.c[keep_mask]   if self.c.ndim == 2   else self.c
-    #     self.chi   = self.chi[keep_mask] if self.chi.ndim == 2 else self.chi
-    #     self.mu    = self.mu[keep_mask]  if self.mu.ndim == 2  else self.mu
-    #     #----------------------------------
-    #     if(self._type_ids is not None):
-    #         self.type_ids = self.type_ids[keep_mask]
-    #     #----------------------------------
-    #     if(self.phylogeny is not None):
-    #         # TODO: properly remove from phylogeny dict
-    #         self.lineage_ids    = self.lineage_ids[keep_mask]
-    #         self.parent_indices = self.parent_indices[keep_mask]
-    #     #----------------------------------
-    #     # self.num_types = self.sigma.shape[0]
-
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     def get_type(self, index=None, type_id=None):
-        # print("get_type")
         type_idx = np.where(np.in1d(self.type_ids, utils.treat_as_list(type_id))) if type_id is not None else index
         if(type_idx is None):
             utils.error(f"Error in TypeSet get_type(): A type index or type id must be given.")
@@ -461,29 +331,12 @@ class TypeSet():
                         c    = self.c[type_idx]   if self.c.ndim == 2   else self.c, 
                         chi  = self.chi[type_idx] if self.chi.ndim == 2 else self.chi, 
                         mu   = self.mu[type_idx]  if self.mu.ndim == 2  else self.mu,
-                        J    = self.J,
-                        # lineage_ids = self.lineage_ids[type_idx] if self.lineage_ids is not None else None,
-                       ) #  has_mutant_set = False
-        # return TypeSet(sigma = self.sigma[type_idx], 
-        #                 b    = self.b[type_idx].reshape(_num_types, self.num_traits)   if self.b.ndim == 2   else self.b, 
-        #                 k    = self.k[type_idx].reshape(_num_types, self.num_traits)   if self.k.ndim == 2   else self.k, 
-        #                 eta  = self.eta[type_idx].reshape(_num_types, self.num_traits) if self.eta.ndim == 2 else self.eta, 
-        #                 l    = self.l[type_idx].reshape(_num_types, self.num_traits)   if self.l.ndim == 2   else self.l, 
-        #                 g    = self.g[type_idx].reshape(_num_types, 1)                 if self.g.ndim == 2   else self.g, 
-        #                 c    = self.c[type_idx].reshape(_num_types, 1)                 if self.c.ndim == 2   else self.c, 
-        #                 chi  = self.chi[type_idx].reshape(_num_types, self.num_traits) if self.chi.ndim == 2 else self.chi, 
-        #                 mu   = self.mu[type_idx].reshape(_num_types, 1)                if self.mu.ndim == 2  else self.mu,
-        #                 J    = self.J,
-        #                 lineage_ids = np.array(self.lineage_ids[type_idx]).flatten() if self.lineage_ids is not None else None,
-        #                ) #  has_mutant_set = False
+                        J    = self.J ) 
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_type_id(self, index):
-        # TODO: Include other (non-sigma) param vals back in the hash (broke after letting params be 1d):
-        # return hash(tuple( self.sigma[index].tolist() + self.b[index].tolist() + self.k[index].tolist() + self.eta[index].tolist()
-        #                    + self.l[index].tolist() + [self.g[index]] + [self.g[index]] + self.chi[index].tolist() + [self.mu[index]] ))
         return hash(tuple( self.sigma[index].tolist() ))
 
 
@@ -491,15 +344,7 @@ class TypeSet():
 
     def get_mutant_indices(self, index):
         type_idx = utils.treat_as_list(index)
-        # mutant_indices = [m for muts_of_idx in [[i for i in range(idx*self.num_traits, (idx+1)*self.num_traits)] for idx in type_idx] for m in muts_of_idx]
-        # mutant_indices = self.mutant_indices[type_idx].ravel()
-        # return mutant_indices
-        # print(self.mutant_indices)
         return self.mutant_indices[type_idx].ravel()
-
-    # def get_parent_indices(self, index):
-    #     mut_idx = utils.treat_as_list(index)
-    #     return mut_idx // self.num_traits
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -544,5 +389,11 @@ class TypeSet():
         self._type_ids       = np.array(self._type_ids)[type_order].tolist()
         self._lineage_ids    = np.array(self._lineage_ids)[type_order].tolist()
         self._mutant_indices = self._mutant_indices = self._mutant_indices.reorder(type_order) if self._mutant_indices is not None else None
-        
+        #----------------------------------
+        return
+
+
+
+
+
 

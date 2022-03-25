@@ -44,13 +44,8 @@ class ExpandableArray():
 
     def add(self, added_arr, axis=0):
         added_arr = np.atleast_2d(added_arr)
-        # print("> add")
-        # print("> self.shape", self.shape, "self.alloc", self.alloc)
-        # print("> added_arr", added_arr, added_arr.shape)
         if(axis == 0):
-            # print("> axis 0")
             while(self._shape[0] + added_arr.shape[0] > self._alloc[0]):
-                # print("> expand")
                 self.expand_alloc(new_alloc = (int(self._alloc[0]*self.default_expand_factor), self._alloc[1]))
             self._arr[self._shape[0]:self._shape[0]+added_arr.shape[0], :added_arr.shape[1]] = added_arr
             self._shape = (self._shape[0] + added_arr.shape[0], self._shape[1])
@@ -59,7 +54,6 @@ class ExpandableArray():
                 self.expand_alloc(new_alloc = (self._alloc[0], int(self._alloc[1]*self.default_expand_factor)))
             self._arr[:added_arr.shape[0], self._shape[1]:self._shape[1]+added_arr.shape[1]] = added_arr
             self._shape = (self._shape[0], self._shape[1] + added_arr.shape[1])
-        # print("> self.shape", self.shape, "self.alloc", self.alloc)
         return self
     
     def trim(self, alloc=None):
