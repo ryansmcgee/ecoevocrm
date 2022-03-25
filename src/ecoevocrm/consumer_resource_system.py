@@ -50,7 +50,7 @@ class ConsumerResourceSystem():
                  threshold_min_rel_abundance   = 1e-6,
                  threshold_eq_abundance_change = 1e4,
                  threshold_precise_integrator  = 1e2,
-                 seed = None ):
+                 seed = None):
 
         #----------------------------------
 
@@ -189,6 +189,14 @@ class ConsumerResourceSystem():
     @property
     def extant_type_indices(self):
         return np.where(self.N > 0)[0]
+
+    @property
+    def abundance(self):
+        return self.N
+
+    @property
+    def rel_abundance(self):
+        return self.N/np.sum(self.N)
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -481,6 +489,13 @@ class ConsumerResourceSystem():
         #----------------------------------
         self._N_series = self._N_series.reorder(type_order)
         self.type_set.reorder_types(type_order) # don't need to reorder mutant_set because type_set.mutant_indices gets reordered and keeps correct pointers
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_extant_type_set(self, type_set=None):
+        type_set = self.type_set if type_set is None else type_set
+        return type_set.get_type(self.extant_type_indices)
 
 
 
