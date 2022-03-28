@@ -36,7 +36,7 @@ class ConsumerResourceSystem():
                  eta           = 1,
                  l             = 0,
                  g             = 1,
-                 c             = 0,
+                 xi            = 0,
                  chi           = None,
                  mu            = 0,
                  J             = None,
@@ -95,7 +95,7 @@ class ConsumerResourceSystem():
             else:
                 utils.error(f"Error in ConsumerResourceSystem __init__(): type_set argument expects object of TypeSet type.")
         else:
-            self.type_set = TypeSet(num_types=system_num_types, num_traits=system_num_resources, sigma=sigma, b=b, k=k, eta=eta, l=l, g=g, c=c, chi=chi, J=J, mu=mu)
+            self.type_set = TypeSet(num_types=system_num_types, num_traits=system_num_resources, sigma=sigma, b=b, k=k, eta=eta, l=l, g=g, xi=xi, chi=chi, J=J, mu=mu)
         # Check that the type set dimensions match the system dimensions:
         if(system_num_types != self.type_set.num_types): 
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system types ({system_num_types}) does not match number of type set types ({self.type_set.num_types}).")
@@ -201,7 +201,7 @@ class ConsumerResourceSystem():
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def run(self, T=1e4, dt=None, integration_method='default'):
+    def run(self, T=1e6, dt=None, integration_method='default'):
 
         t_start   = self.t
         t_elapsed = 0
@@ -331,7 +331,7 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def dynamics(self, t, variables, 
-                    num_types, num_mutants, sigma, b, k, eta, l, g, c, chi, J, mu, energy_costs, energy_uptake_coeffs,
+                    num_types, num_mutants, sigma, b, k, eta, l, g, xi, chi, J, mu, energy_costs, energy_uptake_coeffs,
                     num_resources, rho, tau, omega, D, resource_consumption_mode, resource_inflow_mode):
 
         N_t = np.zeros(num_types+num_mutants)
@@ -466,7 +466,7 @@ class ConsumerResourceSystem():
                               'k':            type_params['k'] if type_params['k'].ndim < 2 else np.concatenate([type_params['k'], mutant_params['k']]),
                               'eta':          type_params['eta'] if type_params['eta'].ndim < 2 else np.concatenate([type_params['eta'], mutant_params['eta']]),
                               'g':            type_params['g'] if type_params['g'].ndim < 2 else np.concatenate([type_params['g'], mutant_params['g']]),
-                              'c':            type_params['c'] if type_params['c'].ndim < 2 else np.concatenate([type_params['c'], mutant_params['c']]),
+                              'xi':           type_params['xi'] if type_params['xi'].ndim < 2 else np.concatenate([type_params['xi'], mutant_params['xi']]),
                               'l':            type_params['l'] if type_params['l'].ndim < 2 else np.concatenate([type_params['l'], mutant_params['l']]),
                               'chi':          type_params['chi'] if type_params['chi'].ndim < 2 else np.concatenate([type_params['chi'], mutant_params['chi']]),
                               'J':            type_params['J'],

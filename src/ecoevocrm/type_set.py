@@ -15,7 +15,7 @@ class TypeSet():
                        eta            = 1,
                        l              = 0,
                        g              = 1,
-                       c              = 0,
+                       xi             = 0,
                        chi            = None,
                        J              = None,
                        mu             = 0,
@@ -53,7 +53,7 @@ class TypeSet():
         self._eta   = self.preprocess_params(eta, has_trait_dim=True)
         self._l     = self.preprocess_params(l,   has_trait_dim=True)
         self._g     = self.preprocess_params(g,   has_trait_dim=False)
-        self._c     = self.preprocess_params(c,   has_trait_dim=False)
+        self._xi    = self.preprocess_params(xi,  has_trait_dim=False)
         self._chi   = self.preprocess_params(chi, has_trait_dim=True)
         self._mu    = self.preprocess_params(mu,  has_trait_dim=False)
 
@@ -111,8 +111,8 @@ class TypeSet():
         return TypeSet.get_array(self._g)
 
     @property
-    def c(self):
-        return TypeSet.get_array(self._c)
+    def xi(self):
+        return TypeSet.get_array(self._xi)
 
     @property
     def chi(self):
@@ -129,7 +129,7 @@ class TypeSet():
     @property
     def energy_costs(self):
         if(self._energy_costs is None):
-            costs = 0 + (self.c.ravel() if self.c.ndim == 2 else self.c)
+            costs = 0 + (self.xi.ravel() if self.xi.ndim == 2 else self.xi)
             if(self.chi is not None):
                 costs += np.sum(self.sigma * self.chi, axis=1)
             if(self.J is not None):
@@ -226,18 +226,18 @@ class TypeSet():
         eta_mut   = np.repeat(self.eta, repeats=self.sigma.shape[1], axis=0) if self.eta.ndim == 2 else self.eta
         l_mut     = np.repeat(self.l, repeats=self.sigma.shape[1], axis=0)   if self.l.ndim == 2   else self.l
         g_mut     = np.repeat(self.g, repeats=self.sigma.shape[1], axis=0)   if self.g.ndim == 2   else self.g
-        c_mut     = np.repeat(self.c, repeats=self.sigma.shape[1], axis=0)   if self.c.ndim == 2   else self.c
+        xi_mut    = np.repeat(self.xi, repeats=self.sigma.shape[1], axis=0)  if self.xi.ndim == 2  else self.xi
         chi_mut   = np.repeat(self.chi, repeats=self.sigma.shape[1], axis=0) if self.chi.ndim == 2 else self.chi
         mu_mut    = np.repeat(self.mu, repeats=self.sigma.shape[1], axis=0)  if self.mu.ndim == 2  else self.mu
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, c=c_mut, chi=chi_mut, J=self.J, mu=mu_mut)
+        mutant_set = TypeSet(sigma=sigma_mut, b=b_mut, k=k_mut, eta=eta_mut, l=l_mut, g=g_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut)
         #----------------------------------
         return mutant_set
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, type_set=None, sigma=None, b=None, k=None, eta=None, l=None, g=None, c=None, chi=None, mu=None, parent_index=None, parent_id=None, ref_type_idx=None): # index=None, 
+    def add_type(self, type_set=None, sigma=None, b=None, k=None, eta=None, l=None, g=None, xi=None, chi=None, mu=None, parent_index=None, parent_id=None, ref_type_idx=None): # index=None, 
         parent_idx   = np.where(self.type_ids==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
@@ -253,7 +253,7 @@ class TypeSet():
                                          eta=eta if eta is not None else self.eta[ref_type_idx],  
                                          l=l if l is not None else self.l[ref_type_idx],  
                                          g=g if g is not None else self.g[ref_type_idx],  
-                                         c=c if c is not None else self.c[ref_type_idx],  
+                                         xi=xi if xi is not None else self.xi[ref_type_idx],  
                                          chi=chi if chi is not None else self.chi[ref_type_idx],  
                                          mu=mu if mu is not None else self.mu[ref_type_idx]
                                          )
@@ -267,7 +267,7 @@ class TypeSet():
         self._eta   = self._eta.add(new_type_set.eta) if isinstance(self._eta, utils.ExpandableArray) else self._eta
         self._l     = self._l.add(new_type_set.l)     if isinstance(self._l,   utils.ExpandableArray) else self._l
         self._g     = self._g.add(new_type_set.g)     if isinstance(self._g,   utils.ExpandableArray) else self._g
-        self._c     = self._c.add(new_type_set.c)     if isinstance(self._c,   utils.ExpandableArray) else self._c
+        self._xi    = self._xi.add(new_type_set.xi)   if isinstance(self._xi,   utils.ExpandableArray) else self._xi
         self._chi   = self._chi.add(new_type_set.chi) if isinstance(self._chi, utils.ExpandableArray) else self._chi
         self._mu    = self._mu.add(new_type_set.mu)   if isinstance(self._mu,  utils.ExpandableArray) else self._mu
         #----------------------------------
@@ -328,7 +328,7 @@ class TypeSet():
                         eta  = self.eta[type_idx] if self.eta.ndim == 2 else self.eta, 
                         l    = self.l[type_idx]   if self.l.ndim == 2   else self.l, 
                         g    = self.g[type_idx]   if self.g.ndim == 2   else self.g, 
-                        c    = self.c[type_idx]   if self.c.ndim == 2   else self.c, 
+                        xi   = self.xi[type_idx]  if self.xi.ndim == 2  else self.xi, 
                         chi  = self.chi[type_idx] if self.chi.ndim == 2 else self.chi, 
                         mu   = self.mu[type_idx]  if self.mu.ndim == 2  else self.mu,
                         J    = self.J ) 
@@ -361,7 +361,7 @@ class TypeSet():
                 'eta':          self.eta if self.eta.ndim < 2 else self.eta[type_idx],
                 'l':            self.l   if self.l.ndim < 2   else self.l[type_idx],
                 'g':            self.g   if self.g.ndim < 2   else self.g[type_idx],
-                'c':            self.c   if self.c.ndim < 2   else self.c[type_idx],
+                'xi':           self.xi  if self.xi.ndim < 2  else self.xi[type_idx],
                 'chi':          self.chi if self.chi.ndim < 2 else self.chi[type_idx],
                 'J':            self.J,
                 'mu':           self.mu  if self.mu.ndim < 2  else self.mu[type_idx],
@@ -376,14 +376,14 @@ class TypeSet():
             utils.error("Error in TypeSet.reorder_types(): The ordering provided has fewer indices than types.")
         #----------------------------------
         self._sigma = self._sigma.reorder(type_order)
-        self._b     = self._b.reorder(type_order)   if isinstance(self._b,   utils.ExpandableArray) else self._b
-        self._k     = self._k.reorder(type_order)   if isinstance(self._k,   utils.ExpandableArray) else self._k
-        self._eta   = self._eta.reorder(type_order) if isinstance(self._eta, utils.ExpandableArray) else self._eta
-        self._l     = self._l.reorder(type_order)   if isinstance(self._l,   utils.ExpandableArray) else self._l
-        self._g     = self._g.reorder(type_order)   if isinstance(self._g,   utils.ExpandableArray) else self._g
-        self._c     = self._c.reorder(type_order)   if isinstance(self._c,   utils.ExpandableArray) else self._c
-        self._chi   = self._chi.reorder(type_order) if isinstance(self._chi, utils.ExpandableArray) else self._chi
-        self._mu    = self._mu.reorder(type_order)  if isinstance(self._mu,  utils.ExpandableArray) else self._mu
+        self._b     = self._b.reorder(type_order)   if isinstance(self._b,   utils.ExpandableArray)  else self._b
+        self._k     = self._k.reorder(type_order)   if isinstance(self._k,   utils.ExpandableArray)  else self._k
+        self._eta   = self._eta.reorder(type_order) if isinstance(self._eta, utils.ExpandableArray)  else self._eta
+        self._l     = self._l.reorder(type_order)   if isinstance(self._l,   utils.ExpandableArray)  else self._l
+        self._g     = self._g.reorder(type_order)   if isinstance(self._g,   utils.ExpandableArray)  else self._g
+        self._xi    = self._xi.reorder(type_order)  if isinstance(self._xi,   utils.ExpandableArray) else self._xi
+        self._chi   = self._chi.reorder(type_order) if isinstance(self._chi, utils.ExpandableArray)  else self._chi
+        self._mu    = self._mu.reorder(type_order)  if isinstance(self._mu,  utils.ExpandableArray)  else self._mu
         self._energy_costs   = None # reset to recalculate upon next reference
         self._parent_indices = np.array(self.parent_indices)[type_order].tolist()
         self._type_ids       = np.array(self._type_ids)[type_order].tolist()
