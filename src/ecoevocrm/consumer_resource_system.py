@@ -32,20 +32,20 @@ class ConsumerResourceSystem():
                  num_resources = None,
                  sigma         = None,
                  b             = 1,
-                 k             = 0,
+                 k             = 1e10,
                  eta           = 1,
                  l             = 0,
                  g             = 1,
                  xi            = 0,
                  chi           = None,
-                 mu            = 0,
                  J             = None,
-                 D             = None,
+                 mu            = 1e-10,                 
                  rho           = 0,
                  tau           = 1,
                  omega         = 1,
-                 resource_consumption_mode     = 'linear',
-                 resource_inflow_mode          = 'constant',
+                 D             = None,
+                 resource_consumption_mode     = 'fast_resource_eq',
+                 resource_inflow_mode          = 'none',
                  threshold_min_abs_abundance   = 1,
                  threshold_min_rel_abundance   = 1e-6,
                  threshold_eq_abundance_change = 1e4,
@@ -201,7 +201,7 @@ class ConsumerResourceSystem():
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def run(self, T=1e6, dt=None, integration_method='default'):
+    def run(self, T, dt=None, integration_method='default'):
 
         t_start   = self.t
         t_elapsed = 0
