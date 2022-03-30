@@ -101,6 +101,10 @@ class ConsumerResourceSystem():
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system types ({system_num_types}) does not match number of type set types ({self.type_set.num_types}).")
         if(system_num_resources != self.type_set.num_traits): 
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system resources ({system_num_resources}) does not match number of type set traits ({self.type_set.num_traits}).")
+
+        # Reference the TypeSet's lineage_ids property to induce assignment of a non-None lineage_id attribute 
+        # (waiting to induce assignment of lineage ids until after a large sim can cause a RecursionError):
+        self.type_set.lineage_ids
         
         #----------------------------------
         # Initialize resource set parameters:
@@ -301,35 +305,6 @@ class ConsumerResourceSystem():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    @staticmethod
-    def resource_demand(N, sigma):
-        return np.einsum(('ij,ij->j' if N.ndim == 2 else 'i,ij->j'), N, sigma)
-
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @staticmethod
-    def growth_rate(N, R, sigma, b, k, eta, l, g, energy_costs, omega, resource_consumption_mode, energy_uptake_coeffs=None):
-        # TODO: Allow for calculating for single N/R or time series of N/Rs
-        energy_uptake_coeffs = omega * (1-l) * sigma * b if energy_uptake_coeffs is None else energy_uptake_coeffs
-        #------------------------------
-        if(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_FASTEQ):
-            resource_demand = ConsumerResourceSystem.resource_demand(N, sigma)
-            energy_uptake   = np.einsum(('ij,ij->i' if k.ndim == 2 else 'ij,j->i'), energy_uptake_coeffs, k/(k + resource_demand))
-            energy_surplus  = energy_uptake - energy_costs
-            growth_rate     = g * energy_surplus
-        elif(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_LINEAR):
-            pass
-        elif(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_MONOD):
-            pass
-        else:
-            pass
-        #------------------------------
-        return growth_rate
-
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     def dynamics(self, t, variables, 
                     num_types, num_mutants, sigma, b, k, eta, l, g, xi, chi, J, mu, energy_costs, energy_uptake_coeffs,
                     num_resources, rho, tau, omega, D, resource_consumption_mode, resource_inflow_mode):
@@ -360,6 +335,35 @@ class ConsumerResourceSystem():
         #------------------------------
 
         return np.concatenate((dNdt, dRdt, dCumPropMut))
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @staticmethod
+    def growth_rate(N, R, sigma, b, k, eta, l, g, energy_costs, omega, resource_consumption_mode, energy_uptake_coeffs=None):
+        # TODO: Allow for calculating for single N/R or time series of N/Rs
+        energy_uptake_coeffs = omega * (1-l) * sigma * b if energy_uptake_coeffs is None else energy_uptake_coeffs
+        #------------------------------
+        if(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_FASTEQ):
+            resource_demand = ConsumerResourceSystem.resource_demand(N, sigma)
+            energy_uptake   = np.einsum(('ij,ij->i' if k.ndim == 2 else 'ij,j->i'), energy_uptake_coeffs, k/(k + resource_demand))
+            energy_surplus  = energy_uptake - energy_costs
+            growth_rate     = g * energy_surplus
+        elif(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_LINEAR):
+            pass
+        elif(resource_consumption_mode == ConsumerResourceSystem.CONSUMPTION_MODE_MONOD):
+            pass
+        else:
+            pass
+        #------------------------------
+        return growth_rate
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @staticmethod
+    def resource_demand(N, sigma):
+        return np.einsum(('ij,ij->j' if N.ndim == 2 else 'i,ij->j'), N, sigma)
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -465,9 +469,9 @@ class ConsumerResourceSystem():
                               'b':            type_params['b'] if type_params['b'].ndim < 2 else np.concatenate([type_params['b'], mutant_params['b']]),
                               'k':            type_params['k'] if type_params['k'].ndim < 2 else np.concatenate([type_params['k'], mutant_params['k']]),
                               'eta':          type_params['eta'] if type_params['eta'].ndim < 2 else np.concatenate([type_params['eta'], mutant_params['eta']]),
+                              'l':            type_params['l'] if type_params['l'].ndim < 2 else np.concatenate([type_params['l'], mutant_params['l']]),
                               'g':            type_params['g'] if type_params['g'].ndim < 2 else np.concatenate([type_params['g'], mutant_params['g']]),
                               'xi':           type_params['xi'] if type_params['xi'].ndim < 2 else np.concatenate([type_params['xi'], mutant_params['xi']]),
-                              'l':            type_params['l'] if type_params['l'].ndim < 2 else np.concatenate([type_params['l'], mutant_params['l']]),
                               'chi':          type_params['chi'] if type_params['chi'].ndim < 2 else np.concatenate([type_params['chi'], mutant_params['chi']]),
                               'J':            type_params['J'],
                               'mu':           type_params['mu'] if type_params['mu'].ndim < 2 else np.concatenate([type_params['mu'], mutant_params['mu']]),
