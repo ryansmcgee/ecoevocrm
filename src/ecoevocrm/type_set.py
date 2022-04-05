@@ -94,33 +94,65 @@ class TypeSet():
     def b(self):
         return TypeSet.get_array(self._b)
 
+    @b.setter
+    def b(self, vals):
+        self._b = self.preprocess_params(vals, has_trait_dim=True)
+
     @property
     def k(self):
         return TypeSet.get_array(self._k)
+
+    @k.setter
+    def k(self, vals):
+        self._k = self.preprocess_params(vals, has_trait_dim=True)
 
     @property
     def eta(self):
         return TypeSet.get_array(self._eta)
 
+    @eta.setter
+    def eta(self, vals):
+        self._eta = self.preprocess_params(vals, has_trait_dim=True)
+
     @property
     def l(self):
         return TypeSet.get_array(self._l)
+
+    @l.setter
+    def l(self, vals):
+        self._l = self.preprocess_params(vals, has_trait_dim=True)
 
     @property
     def g(self):
         return TypeSet.get_array(self._g)
 
+    @g.setter
+    def g(self, vals):
+        self._g = self.preprocess_params(vals, has_trait_dim=False)
+
     @property
     def xi(self):
         return TypeSet.get_array(self._xi)
+
+    @xi.setter
+    def xi(self, vals):
+        self._xi = self.preprocess_params(vals, has_trait_dim=False)
 
     @property
     def chi(self):
         return TypeSet.get_array(self._chi)
 
+    @chi.setter
+    def chi(self, vals):
+        self._chi = self.preprocess_params(vals, has_trait_dim=True)
+
     @property
     def mu(self):
         return TypeSet.get_array(self._mu)
+
+    @mu.setter
+    def mu(self, vals):
+        self._mu = self.preprocess_params(vals, has_trait_dim=False)
 
     @property
     def J(self):
@@ -277,7 +309,7 @@ class TypeSet():
             self._mutant_indices.add(np.arange((self.num_types-1)*self.num_traits, (self.num_types)*self.num_traits))
         #----------------------------------
         if(self._energy_costs is not None):
-            self._energy_costs.add(new_type_set.energy_costs)
+            self._energy_costs.add(new_type_set.energy_costs, axis=1)
         #----------------------------------
         if(self._type_ids is not None):
             self._type_ids.extend(new_type_set.type_ids)
@@ -320,7 +352,6 @@ class TypeSet():
         type_idx = np.where(np.in1d(self.type_ids, utils.treat_as_list(type_id))) if type_id is not None else index
         if(type_idx is None):
             utils.error(f"Error in TypeSet get_type(): A type index or type id must be given.")
-        _num_types = 1 if type_idx.ndim == 0 else len(type_idx)
         #----------------------------------
         return TypeSet(sigma = self.sigma[type_idx], 
                         b    = self.b[type_idx]   if self.b.ndim == 2   else self.b, 

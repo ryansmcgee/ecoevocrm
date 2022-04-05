@@ -158,6 +158,23 @@ def error(message, trigger_exit=True):
         sys.exit()
 
 
+def get_perturbations(vals, dist, args, mode, element_wise):
+    # dist == constant: args={'val': ...}
+    # dist == uniform:  args={'low': ..., 'high': ...}
+    # dist == normal:   args={'mean': ..., 'std': ...}
+    if(dist == 'constant'):
+        perturb_vals = np.full_like(vals, fill_value=args['val']) if element_wise else args['val']
+    elif(dist == 'uniform'):
+        perturb_vals = np.random.uniform(low=args['low'], high=args['high'], size=(vals.shape if element_wise else 1))
+    elif(dist == 'normal'):
+        perturb_vals = np.random.normal(loc=args['mean'], scale=args['std'], size=(vals.shape if element_wise else 1))
+    #----------------------------------
+    if not element_wise or not isinstance(vals, (list, np.ndarray)):
+        perturb_vals = perturb_vals.ravel()[0]
+    #----------------------------------
+    return perturb_vals
+
+
 
 
 

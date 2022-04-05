@@ -195,6 +195,10 @@ class ConsumerResourceSystem():
         return np.where(self.N > 0)[0]
 
     @property
+    def extant_type_set(self):
+        return self.get_extant_type_set()
+
+    @property
     def abundance(self):
         return self.N
 
@@ -202,10 +206,22 @@ class ConsumerResourceSystem():
     def rel_abundance(self):
         return self.N/np.sum(self.N)
 
+    @property
+    def biomass(self):
+        return np.sum(self.N)
+
+    @property
+    def num_types(self):
+        return self.type_set.num_types
+
+    @property
+    def num_resources(self):
+        return self.resource_set.num_resources
+
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def run(self, T, dt=None, integration_method='default'):
+    def run(self, T, dt=None, integration_method='default', reorder_types_by_phylogeny=True):
 
         t_start   = self.t
         t_elapsed = 0
@@ -277,7 +293,7 @@ class ConsumerResourceSystem():
             
             t_elapsed = self.t - t_start
 
-            typeCountStr = f"{num_extant_types}*({self.mutant_set.num_types})/{self.type_set.num_types}"
+            typeCountStr = f"{num_extant_types}/{self.type_set.num_types}*({self.mutant_set.num_types})"
 
             #------------------------------
             # Handle events and update the system's states accordingly:
@@ -299,6 +315,9 @@ class ConsumerResourceSystem():
         self._t_series.trim()
         self._N_series.trim()
         self._R_series.trim()
+
+        if(reorder_types_by_phylogeny):
+            self.reorder_types()
 
         return
 
@@ -406,6 +425,7 @@ class ConsumerResourceSystem():
         #----------------------------------
         return
     
+
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def handle_type_loss(self):
@@ -500,6 +520,88 @@ class ConsumerResourceSystem():
     def get_extant_type_set(self, type_set=None):
         type_set = self.type_set if type_set is None else type_set
         return type_set.get_type(self.extant_type_indices)
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def combine(self, added_system):
+
+        # This implementation assumes that the 'self' system that is combined 'into' keeps its thresholds and other metadata attributes.
+        # TODO: Properly combine resource sets (right now the 'self' system resources are kept as is)
+        #----------------------------------
+        # TODO: At the moment, it seems that there is no good way to reconcile parent indices and phylogenies/lineage ids from multiple systems,
+        # so these are currently being reset in the combined system.
+        self.type_set._parent_indices = [None for i in range(self.num_types)]
+        self.type_set._lineage_ids    = None
+        #----------------------------------
+        for comb_type_idx in range(added_system.type_set.num_types):
+            # print(comb_type_idx)
+            # Retrieve the added type and some of its properties:
+            comb_type    = added_system.type_set.get_type(comb_type_idx)
+            comb_type_id = added_system.type_set.get_type_id(comb_type_idx)
+            comb_type_abundance = added_system.N[comb_type_idx]
+            #----------------------------------
+            if(comb_type_id in self.type_set.type_ids):
+                # The added type is a pre-existing type in the current population; get its index:
+                preexisting_type_idx = np.where(np.array(self.type_set.type_ids) == comb_type_id)[0][0]
+                # print("preexisting @", preexisting_type_idx, "abd", self.N[preexisting_type_idx], "+", comb_type_abundance)
+                # Add abundance equal to the added types abundance:
+                self.set_type_abundance(type_index=preexisting_type_idx, abundance=self.get_type_abundance(preexisting_type_idx)+comb_type_abundance)
+                # print("\t= comb abd", self.N[preexisting_type_idx])
+            else:
+                # The added type is not present in the current population:
+                # Add the new type to the population at its abundance in the added_system:
+                # print("new type", "abd", "->", comb_type_abundance)
+                self.add_type(comb_type, abundance=comb_type_abundance, parent_index=None) # note that parent_index is None here under assumption that parent indices need to be reset in combined systems
+            #----------------------------------
+        return self
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def perturb(self, param, dist, args, mode='multiplicative_proportional', element_wise=True):
+        params = utils.treat_as_list(param)
+        #----------------------------------
+        for param in params:
+            if(param == 'b'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.b, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.b = (self.type_set.b * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.b * perturb_vals) if mode == 'multiplicative' else (self.type_set.b + perturb_vals) if mode == 'additive' else self.type_set.b
+            elif(param == 'k'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.k, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.k = (self.type_set.k * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.k * perturb_vals) if mode == 'multiplicative' else (self.type_set.k + perturb_vals) if mode == 'additive' else self.type_set.k
+            elif(param == 'eta'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.eta, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.eta = (self.type_set.eta * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.eta * perturb_vals) if mode == 'multiplicative' else (self.type_set.eta + perturb_vals) if mode == 'additive' else self.type_set.eta
+            elif(param == 'l'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.l, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.l = (self.type_set.l * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.l * perturb_vals) if mode == 'multiplicative' else (self.type_set.l + perturb_vals) if mode == 'additive' else self.type_set.l
+            elif(param == 'g'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.g, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.g = (self.type_set.g * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.g * perturb_vals) if mode == 'multiplicative' else (self.type_set.g + perturb_vals) if mode == 'additive' else self.type_set.g
+            elif(param == 'xi'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.xi, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.xi = (self.type_set.xi * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.xi * perturb_vals) if mode == 'multiplicative' else (self.type_set.xi + perturb_vals) if mode == 'additive' else self.type_set.xi
+            elif(param == 'chi'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.chi, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.chi = (self.type_set.chi * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.chi * perturb_vals) if mode == 'multiplicative' else (self.type_set.chi + perturb_vals) if mode == 'additive' else self.type_set.chi
+            elif(param == 'mu'): 
+                perturb_vals    = utils.get_perturbations(self.type_set.mu, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.type_set.mu = (self.type_set.mu * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.mu * perturb_vals) if mode == 'multiplicative' else (self.type_set.mu + perturb_vals) if mode == 'additive' else self.type_set.mu
+            elif(param == 'rho'): 
+                perturb_vals    = utils.get_perturbations(self.resource_set.rho, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.resource_set.rho = (self.resource_set.rho * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.rho * perturb_vals) if mode == 'multiplicative' else (self.resource_set.rho + perturb_vals) if mode == 'additive' else self.resource_set.rho
+            elif(param == 'tau'): 
+                perturb_vals    = utils.get_perturbations(self.resource_set.tau, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.resource_set.tau = (self.resource_set.tau * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.tau * perturb_vals) if mode == 'multiplicative' else (self.resource_set.tau + perturb_vals) if mode == 'additive' else self.resource_set.tau
+            elif(param == 'omega'): 
+                perturb_vals    = utils.get_perturbations(self.resource_set.omega, dist=dist, args=args, mode=mode, element_wise=element_wise)
+                self.resource_set.omega = (self.resource_set.omega * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.omega * perturb_vals) if mode == 'multiplicative' else (self.resource_set.omega + perturb_vals) if mode == 'additive' else self.resource_set.omega
+        #----------------------------------
+        return self
+            
+            
+
+
 
 
 
