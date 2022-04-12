@@ -7,19 +7,19 @@ import ecoevocrm.utils as utils
 
 class TypeSet():
 
-    def __init__(self, num_types      = None,
-                       num_traits     = None,
-                       sigma          = None,
-                       b              = 1,
-                       k              = 0,
-                       eta            = 1,
-                       l              = 0,
-                       g              = 1,
-                       xi             = 0,
-                       chi            = None,
-                       J              = None,
-                       mu             = 0,
-                       lineage_ids    = None ):
+    def __init__(self, num_types   = None,
+                       num_traits  = None,
+                       sigma       = None,
+                       b           = 1,
+                       k           = 1e10,
+                       eta         = 1,
+                       l           = 0,
+                       g           = 1,
+                       xi          = 0,
+                       chi         = None,
+                       J           = None,
+                       mu          = 1e-10, 
+                       lineage_ids = None ):
 
         #----------------------------------
         # Determine the number of types and traits,
@@ -48,16 +48,16 @@ class TypeSet():
         # Initialize parameter vectors/matrices:
         #----------------------------------
 
-        self._b     = self.preprocess_params(b,   has_trait_dim=True)
-        self._k     = self.preprocess_params(k,   has_trait_dim=True)
-        self._eta   = self.preprocess_params(eta, has_trait_dim=True)
-        self._l     = self.preprocess_params(l,   has_trait_dim=True)
-        self._g     = self.preprocess_params(g,   has_trait_dim=False)
-        self._xi    = self.preprocess_params(xi,  has_trait_dim=False)
-        self._chi   = self.preprocess_params(chi, has_trait_dim=True)
-        self._mu    = self.preprocess_params(mu,  has_trait_dim=False)
+        self._b   = self.preprocess_params(b,   has_trait_dim=True)
+        self._k   = self.preprocess_params(k,   has_trait_dim=True)
+        self._eta = self.preprocess_params(eta, has_trait_dim=True)
+        self._l   = self.preprocess_params(l,   has_trait_dim=True)
+        self._g   = self.preprocess_params(g,   has_trait_dim=False)
+        self._xi  = self.preprocess_params(xi,  has_trait_dim=False)
+        self._mu  = self.preprocess_params(mu,  has_trait_dim=False)
 
-        self._J     = utils.reshape(J, shape=(self.num_traits, self.num_traits)) if J is not None else None
+        self._chi = self.preprocess_params(chi, has_trait_dim=True) if chi is not None else None
+        self._J   = utils.reshape(J, shape=(self.num_traits, self.num_traits)) if J is not None else None
 
         #----------------------------------
         # Initialize other type properties/metadata:
@@ -162,13 +162,25 @@ class TypeSet():
     def energy_costs(self):
         if(self._energy_costs is None):
             costs = 0 + (self.xi.ravel() if self.xi.ndim == 2 else self.xi)
-            if(self.chi is not None):
+            if(self._chi is not None):
                 costs += np.sum(self.sigma * self.chi, axis=1)
-            if(self.J is not None):
+            if(self._J is not None):
                 costs += -1 * np.sum(self.sigma * np.dot(self.sigma, self.J), axis=1)
             self._energy_costs = utils.ExpandableArray(costs)
         return TypeSet.get_array(self._energy_costs).ravel()
 
+    @property
+    def xi_cost_terms(self):
+        return np.sum(self.sigma * self.chi, axis=1)
+
+    @property
+    def chi_cost_terms(self):
+        return np.sum(self.sigma * self.chi, axis=1) if self._chi is not None else 0
+    
+    @property
+    def J_cost_terms(self):
+        return -1 * np.sum(self.sigma * np.dot(self.sigma, self.J), axis=1) if self._J is not None else 0
+    
     @property
     def type_ids(self):
         if(self._type_ids is None):
@@ -417,9 +429,9 @@ class TypeSet():
         self._mu    = self._mu.reorder(type_order)  if isinstance(self._mu,  utils.ExpandableArray)  else self._mu
         self._energy_costs   = None # reset to recalculate upon next reference
         self._parent_indices = np.array(self.parent_indices)[type_order].tolist()
-        self._type_ids       = np.array(self._type_ids)[type_order].tolist()
-        self._lineage_ids    = np.array(self._lineage_ids)[type_order].tolist()
-        self._mutant_indices = self._mutant_indices = self._mutant_indices.reorder(type_order) if self._mutant_indices is not None else None
+        self._type_ids       = np.array(self._type_ids)[type_order].tolist() if self._type_ids is not None else None
+        self._lineage_ids    = np.array(self._lineage_ids)[type_order].tolist() if self._lineage_ids is not None else None
+        self._mutant_indices = self._mutant_indices.reorder(type_order) if self._mutant_indices is not None else None
         #----------------------------------
         return
 

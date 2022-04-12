@@ -143,6 +143,14 @@ def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
         return  arr
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def binary_combinations(num_digits, exclude_all_zeros=False):
+    import itertools
+    combos = np.array([list(i) for i in itertools.product([0, 1], repeat=num_digits)])
+    return combos if not exclude_all_zeros else combos[1:, :]
+
+
 def treat_as_list(val):
     if(not isinstance(val, (list, np.ndarray)) and val is not None):
         return [val]

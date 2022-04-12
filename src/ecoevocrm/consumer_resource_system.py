@@ -50,6 +50,7 @@ class ConsumerResourceSystem():
                  threshold_min_rel_abundance   = 1e-6,
                  threshold_eq_abundance_change = 1e4,
                  threshold_precise_integrator  = 1e2,
+                 check_event_low_abundance     = False,
                  seed = None):
 
         #----------------------------------
@@ -125,7 +126,7 @@ class ConsumerResourceSystem():
         #----------------------------------
         if(N_init is None or R_init is None):
             utils.error(f"Error in ConsumerResourceSystem __init__(): Values for N_init and R_init must be provided.")
-        self._N_series = utils.ExpandableArray(utils.reshape(N_init, shape=(system_num_types, 1)), alloc_shape=(self.resource_set.num_resources*25, 1))
+        self._N_series = utils.ExpandableArray(utils.reshape(N_init, shape=(system_num_types, 1)), alloc_shape=(max(self.resource_set.num_resources*25, system_num_types), 1))
         self._R_series = utils.ExpandableArray(utils.reshape(R_init, shape=(system_num_resources, 1)), alloc_shape=(self.resource_set.num_resources, 1))
 
         #----------------------------------
@@ -141,6 +142,7 @@ class ConsumerResourceSystem():
         self.threshold_min_abs_abundance   = threshold_min_abs_abundance
         self.threshold_min_rel_abundance   = threshold_min_rel_abundance
         self.threshold_precise_integrator  = threshold_precise_integrator
+        self.check_event_low_abundance     = check_event_low_abundance
 
         #----------------------------------
         # Initialize system options:
@@ -211,6 +213,10 @@ class ConsumerResourceSystem():
         return np.sum(self.N)
 
     @property
+    def fitness(self):
+        return self.growth_rate(self.N, self.R, self.type_set.sigma, self.type_set.b, self.type_set.k, self.type_set.eta, self.type_set.l, self.type_set.g, self.type_set.energy_costs, self.resource_set.omega, self.resource_consumption_mode)
+    
+    @property
     def num_types(self):
         return self.type_set.num_types
 
@@ -226,9 +232,9 @@ class ConsumerResourceSystem():
         t_start   = self.t
         t_elapsed = 0
 
-        self._t_series.expand_alloc((self._t_series.alloc[0], self._t_series.alloc[1]+int(T/dt if dt is not None else T/0.1)))
-        self._N_series.expand_alloc((self._N_series.alloc[0], self._N_series.alloc[1]+int(T/dt if dt is not None else T/0.1)))
-        self._R_series.expand_alloc((self._R_series.alloc[0], self._R_series.alloc[1]+int(T/dt if dt is not None else T/0.1)))
+        self._t_series.expand_alloc((self._t_series.alloc[0], self._t_series.alloc[1]+int(T/dt if dt is not None else 10000)))
+        self._N_series.expand_alloc((self._N_series.alloc[0], self._N_series.alloc[1]+int(T/dt if dt is not None else 10000)))
+        self._R_series.expand_alloc((self._R_series.alloc[0], self._R_series.alloc[1]+int(T/dt if dt is not None else 10000)))
 
         while(t_elapsed < T):
 
@@ -243,16 +249,17 @@ class ConsumerResourceSystem():
             t_eval = np.arange(start=t_span[0], stop=t_span[1]+dt, step=dt) if dt is not None else None,
 
             # Get the indices and count of extant types (abundance > 0):
-            num_extant_types = len(self.extant_type_indices)
+            self._active_type_indices = self.extant_type_indices
+            num_extant_types = len(self._active_type_indices)
 
             # Set the initial conditions for this integration epoch:
-            N_init = self.N[self.extant_type_indices] 
+            N_init = self.N[self._active_type_indices] 
             R_init = self.R 
             cumPropMut_init = np.array([0])
             init_cond = np.concatenate([N_init, R_init, cumPropMut_init])
 
             # Get the params for the dynamics:
-            params = self.get_dynamics_params(self.extant_type_indices)
+            params = self.get_dynamics_params(self._active_type_indices)
 
             # Draw a random propensity threshold for triggering the next Gillespie mutation event:
             self.threshold_mutation_propensity = np.random.exponential(1)
@@ -275,7 +282,7 @@ class ConsumerResourceSystem():
                                              args   = params,
                                              t_span = (self.t, self.t+T),
                                              t_eval = np.arange(start=self.t, stop=self.t+T+dt, step=dt) if dt is not None else None,
-                                             events = [self.event_mutation],
+                                             events = [self.event_mutation, self.event_low_abundance] if self.check_event_low_abundance else [self.event_mutation],
                                              method = _integration_method )
 
             #------------------------------
@@ -283,7 +290,7 @@ class ConsumerResourceSystem():
             #------------------------------
 
             N_epoch = np.zeros(shape=(self._N_series.shape[0], len(sol.t)))
-            N_epoch[self.extant_type_indices] = sol.y[:num_extant_types]
+            N_epoch[self._active_type_indices] = sol.y[:num_extant_types]
             
             R_epoch = sol.y[-1-self.resource_set.num_resources:-1]
             
@@ -302,6 +309,10 @@ class ConsumerResourceSystem():
                 if(len(sol.t_events[0]) > 0):
                     print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="")
                     self.handle_mutation_event()
+                    self.handle_type_loss()
+                if(len(sol.t_events) > 1 and len(sol.t_events[1]) > 0):
+                    print(f"[ Low abundance event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="")
+                    # print(f"\n\n[ Low abundance event occurred at  t={self.t:.4f} {typeCountStr}]\n\n")
                     self.handle_type_loss()
             elif(sol.status == 0): # Reached end T successfully
                 self.handle_type_loss()
@@ -394,12 +405,31 @@ class ConsumerResourceSystem():
     event_mutation.direction = -1
     event_mutation.terminal  = True
 
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def event_low_abundance(self, t, variables, *args):
+        num_types = args[0]
+        N_t = variables[:num_types]
+        #------------------------------
+        abundances_abs = N_t[N_t > 0]
+        abundances_rel = abundances_abs/np.sum(abundances_abs)
+        # print("# ", np.min( abundances_abs), 
+        #                     np.any(abundances_abs < self.threshold_min_abs_abundance), 
+        #                     np.min(abundances_rel),
+        #                     np.any(abundances_rel < self.threshold_min_rel_abundance),
+        #                     '-' if np.any(abundances_abs < self.threshold_min_abs_abundance) or np.any(abundances_rel < self.threshold_min_rel_abundance) else 1)
+        return -1 if np.any(abundances_abs < self.threshold_min_abs_abundance) or np.any(abundances_rel < self.threshold_min_rel_abundance) else 1
+    #------------------------------
+    event_low_abundance.direction = -1
+    event_low_abundance.terminal  = True
+
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def handle_mutation_event(self):
         # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
-        mutant_indices   = self.type_set.get_mutant_indices(self.extant_type_indices)
+        mutant_indices   = self.type_set.get_mutant_indices(self._active_type_indices)
         mutant_drawprobs = self.mutation_propensities/np.sum(self.mutation_propensities)
         mutant_idx       = np.random.choice(mutant_indices, p=mutant_drawprobs)
         # Retrieve the mutant and some of its properties:
@@ -468,7 +498,7 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_type_abundance(self, type_index=None, type_id=None, t=None, t_index=None):
-        type_indices = [ np.where(self.type_set.type_ids == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+        type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
         time_indices = [ np.where(self.t_series == t_)[0] for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
         #----------------------------------
         abundances = self.N_series[type_indices, time_indices]
@@ -535,7 +565,6 @@ class ConsumerResourceSystem():
         self.type_set._lineage_ids    = None
         #----------------------------------
         for comb_type_idx in range(added_system.type_set.num_types):
-            # print(comb_type_idx)
             # Retrieve the added type and some of its properties:
             comb_type    = added_system.type_set.get_type(comb_type_idx)
             comb_type_id = added_system.type_set.get_type_id(comb_type_idx)
@@ -544,14 +573,11 @@ class ConsumerResourceSystem():
             if(comb_type_id in self.type_set.type_ids):
                 # The added type is a pre-existing type in the current population; get its index:
                 preexisting_type_idx = np.where(np.array(self.type_set.type_ids) == comb_type_id)[0][0]
-                # print("preexisting @", preexisting_type_idx, "abd", self.N[preexisting_type_idx], "+", comb_type_abundance)
                 # Add abundance equal to the added types abundance:
                 self.set_type_abundance(type_index=preexisting_type_idx, abundance=self.get_type_abundance(preexisting_type_idx)+comb_type_abundance)
-                # print("\t= comb abd", self.N[preexisting_type_idx])
             else:
                 # The added type is not present in the current population:
                 # Add the new type to the population at its abundance in the added_system:
-                # print("new type", "abd", "->", comb_type_abundance)
                 self.add_type(comb_type, abundance=comb_type_abundance, parent_index=None) # note that parent_index is None here under assumption that parent indices need to be reset in combined systems
             #----------------------------------
         return self
@@ -598,6 +624,32 @@ class ConsumerResourceSystem():
                 self.resource_set.omega = (self.resource_set.omega * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.omega * perturb_vals) if mode == 'multiplicative' else (self.resource_set.omega + perturb_vals) if mode == 'additive' else self.resource_set.omega
         #----------------------------------
         return self
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_fitness(self, t=None, t_index=None):
+        t_idx        = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
+        return self.growth_rate(self.N_series[:, t_idx], self.R_series[:, t_idx], self.type_set.sigma, self.type_set.b, self.type_set.k, self.type_set.eta, self.type_set.l, self.type_set.g, self.type_set.energy_costs, self.resource_set.omega, self.resource_consumption_mode)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_most_fit_types(self, rank_cutoff=None, fitness_cutoff=None, t=None, t_index=None):
+        rank_cutoff    = 1 if rank_cutoff is None else rank_cutoff
+        fitness_cutoff = np.min(self.fitness) if fitness_cutoff is None else fitness_cutoff
+        t_idx          = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
+        #----------------------------------
+        return self.type_set.get_type(self.get_fitness(t_index=t_idx)[self.get_fitness(t_index=t_idx) >= fitness_cutoff].argsort()[::-1][:rank_cutoff])
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_lowest_cost_types(self, rank_cutoff=None, cost_cutoff=None):
+        rank_cutoff = 1 if rank_cutoff is None else rank_cutoff
+        cost_cutoff = np.max(self.type_set.energy_costs) if cost_cutoff is None else cost_cutoff
+        #----------------------------------
+        return self.type_set.get_type(self.type_set.energy_costs[self.type_set.energy_costs <= cost_cutoff].argsort()[:rank_cutoff])
+
             
             
 
