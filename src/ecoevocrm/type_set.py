@@ -19,7 +19,11 @@ class TypeSet():
                        chi         = None,
                        J           = None,
                        mu          = 1e-10, 
-                       lineage_ids = None ):
+                       lineage_ids = None,
+                       normalize_phenotypes = False,
+                       binarize_traits_chi_cost_terms = False,
+                       binarize_traits_J_cost_terms = False
+                    ):
 
         #----------------------------------
         # Determine the number of types and traits,
@@ -41,6 +45,12 @@ class TypeSet():
         #----------------------------------
         
         self.num_traits = num_traits
+
+        self.normalize_phenotypes = normalize_phenotypes
+        if(self.normalize_phenotypes):
+            norm_denom = sigma.sum(axis=1, keepdims=1)
+            norm_denom[norm_denom == 0] = 1
+            sigma = sigma/norm_denom
 
         self._sigma = utils.ExpandableArray(utils.reshape(sigma, shape=(num_types, num_traits)))
 
@@ -74,6 +84,9 @@ class TypeSet():
         self._lineage_ids = lineage_ids if lineage_ids is not None else None
         
         self.phylogeny = {}
+
+        self.binarize_traits_chi_cost_terms = binarize_traits_chi_cost_terms
+        self.binarize_traits_J_cost_terms   = binarize_traits_J_cost_terms
                 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -162,24 +175,28 @@ class TypeSet():
     def energy_costs(self):
         if(self._energy_costs is None):
             costs = 0 + (self.xi.ravel() if self.xi.ndim == 2 else self.xi)
-            if(self._chi is not None):
-                costs += np.sum(self.sigma * self.chi, axis=1)
-            if(self._J is not None):
-                costs += -1 * np.sum(self.sigma * np.dot(self.sigma, self.J), axis=1)
+            costs += self.chi_cost_terms
+            costs += self.J_cost_terms
+            if(np.any(costs < 0)):
+                neg_indices = np.where(costs < 0)[0]
+                print("Warning: Negative energy_costs encountered for one or more types; capping energy_costs to 0")
+                costs = costs.clip(min=0)
             self._energy_costs = utils.ExpandableArray(costs)
         return TypeSet.get_array(self._energy_costs).ravel()
 
     @property
     def xi_cost_terms(self):
-        return np.sum(self.sigma * self.chi, axis=1)
+        return (self.xi.ravel() if self.xi.ndim == 2 else self.xi)
 
     @property
     def chi_cost_terms(self):
-        return np.sum(self.sigma * self.chi, axis=1) if self._chi is not None else 0
+        _sigma = self.sigma if not self.binarize_traits_chi_cost_terms else (self.sigma > 0).astype(int)
+        return np.sum(_sigma * self.chi, axis=1) if self._chi is not None else 0
     
     @property
     def J_cost_terms(self):
-        return -1 * np.sum(self.sigma * np.dot(self.sigma, self.J), axis=1) if self._J is not None else 0
+        _sigma = self.sigma if not self.binarize_traits_J_cost_terms else (self.sigma > 0).astype(int)
+        return -1 * np.sum(_sigma * np.dot(_sigma, self.J), axis=1) if self._J is not None else 0
     
     @property
     def type_ids(self):
@@ -253,9 +270,15 @@ class TypeSet():
 
     def generate_mutant_phenotypes(self, sigma=None):
         sigma = self.sigma if sigma is None else sigma
+        sigma = (sigma != 0).astype(float)
         #----------------------------------
         mutations = np.tile(np.identity(sigma.shape[1]), reps=(sigma.shape[0], 1))
         sigma_mut = 1 * np.logical_xor( np.repeat(sigma, repeats=sigma.shape[1], axis=0), mutations )
+        #----------------------------------
+        if(self.normalize_phenotypes):
+            norm_denom = sigma_mut.sum(axis=1, keepdims=1)
+            norm_denom[norm_denom == 0] = 1
+            sigma_mut = sigma_mut/norm_denom
         #----------------------------------
         return sigma_mut
 
@@ -380,7 +403,7 @@ class TypeSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_type_id(self, index):
-        return hash(tuple( self.sigma[index].tolist() ))
+        return hash(tuple( self.sigma[index].ravel().tolist() ))
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

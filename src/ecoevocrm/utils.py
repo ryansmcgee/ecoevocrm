@@ -90,12 +90,22 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
             if(i >= j):
                 continue
             M[i,j] = np.random.normal( loc=0, scale=J_0*(1/(1 + np.exp((max(i,j) - n_star)/delta))) )
+    elif(mode == 'choice'):
+        M = np.random.choice(a=args['a'], size=shape)
     else:
         error(f"Error in random_matrix(): generator mode '{mode}' is not recognized.")
     #--------------------------------
     # Apply specified sparsity:
-    zeroed_indices = np.random.choice(M.shape[1]*M.shape[0], replace=False, size=int(M.shape[1]*M.shape[0]*sparsity))
-    M[np.unravel_index(zeroed_indices, M.shape)] = 0 
+    # num_ = range(len(np.triu_indices(M.shape[0], k=0 if diagonal is not None else 1)[0])) if triangular else M.shape[1]*M.shape[0]
+    # zeroed_indices = np.random.choice(, replace=False, size=int(M.shape[1]*M.shape[0]*sparsity))        
+    if(triangular):
+        active_indices   = np.triu_indices(M.shape[0], k=0 if diagonal is not None and diagonal != 0 else 1)
+        zeroed_indices_i = np.random.choice(range(len(active_indices[0])), replace=False, size=int(len(active_indices[0])*sparsity))
+        zeroed_indices   = (active_indices[0][zeroed_indices_i], active_indices[1][zeroed_indices_i])
+        M[zeroed_indices] = 0
+    else:
+        zeroed_indices = np.random.choice(M.shape[1]*M.shape[0], replace=False, size=int(M.shape[1]*M.shape[0]*sparsity))
+        M[np.unravel_index(zeroed_indices, M.shape)] = 0 
     #--------------------------------
     # Make symmetric, if applicable:
     if(symmetric):
@@ -181,6 +191,24 @@ def get_perturbations(vals, dist, args, mode, element_wise):
         perturb_vals = perturb_vals.ravel()[0]
     #----------------------------------
     return perturb_vals
+
+
+
+
+
+
+
+
+def get_boltzmann_temp_for_entropy(energy, target_entropy):
+    import scipy
+    def entropy_diff(beta, energy, target_entropy):
+        boltzmann_dist = np.exp(-beta * energy) / np.sum(np.exp(-beta * energy))
+        boltzmann_entropy = scipy.stats.entropy(boltzmann_dist)
+        return np.abs(boltzmann_entropy - target_entropy)
+    res = scipy.optimize.minimize(entropy_diff, x0=1, args=(energy, target_entropy), method='Nelder-Mead')
+    beta_fit = res['x'][0]
+    return beta_fit
+
 
 
 

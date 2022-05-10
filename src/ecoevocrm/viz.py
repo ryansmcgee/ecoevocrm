@@ -135,3 +135,97 @@ def Lstar_types_plot(system, ax=None, figsize=(7,5)):
         sns.despine()
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cutoff=None):
+    
+    type_set = strainpool_system.type_set
+    
+    rank_cutoff   = min(len(type_weights) if rank_cutoff is None else rank_cutoff, len(type_weights))
+    weight_cutoff = max(np.min(type_weights) if weight_cutoff is None else weight_cutoff, 0)
+    
+    active_type_indices = np.argsort(type_weights)[::-1]
+    
+    active_type_indices = [i for i in active_type_indices if type_weights[i] > weight_cutoff][:rank_cutoff]
+    
+    trait_weights = np.sum(type_weights[active_type_indices, np.newaxis] * type_set.sigma[active_type_indices], axis=0)
+    trait_weights = trait_weights/np.sum(trait_weights)
+    
+    #----------
+    
+    left    = 0.1
+    bottom  = 0.1
+    pheno_height  = 0.9
+    pheno_width   = pheno_height * (type_set.num_traits/len(active_type_indices))
+    histx_height  = 0.1
+    histy_width   = 0.1
+    costs_width   = 0.1
+    spacing = 0.02
+
+    rect_pheno = [left, bottom, pheno_width, pheno_height]
+    rect_histx = [left, bottom + pheno_height + spacing, pheno_width, histx_height]
+    rect_histy = [left + pheno_width + spacing, bottom, histy_width, pheno_height]
+    rect_costs = [left + pheno_width + spacing + histy_width + spacing, bottom, costs_width, pheno_height]    
+
+    fig = plt.figure(figsize=(10, 10))
+
+    ax_pheno = fig.add_axes(rect_pheno)
+    ax_histx = fig.add_axes(rect_histx, sharex=ax_pheno)
+    ax_histy = fig.add_axes(rect_histy, sharey=ax_pheno)
+    ax_costs = fig.add_axes(rect_costs, sharey=ax_pheno)
+    
+    sns.heatmap(type_set.sigma[active_type_indices], ax=ax_pheno, cmap='Greys', cbar=False)
+    ax_pheno.set_xlabel('traits')
+    ax_pheno.set_ylabel('types in strain pool')
+    ax_pheno.set_yticks(0.5+np.array(range(len(active_type_indices))))
+    ax_pheno.set_yticklabels(active_type_indices, rotation=0)
+    
+    ax_histy.barh(range(len(type_weights[active_type_indices])), type_weights[active_type_indices], 1, align='edge', edgecolor='white', alpha=0.5)
+    ax_histy.tick_params(axis='y', left=True, labelleft=False)
+    ax_histy.spines['top'].set_visible(False)
+    ax_histy.spines['right'].set_visible(False)
+    ax_histy.set_xlabel('type weight')
+    
+    ax_histx.bar(range(len(trait_weights)), trait_weights, 1, align='edge', edgecolor='white', alpha=0.5)
+    ax_histx.tick_params(axis='x', bottom=True, labelbottom=False)
+    ax_histx.spines['top'].set_visible(False)
+    ax_histx.spines['right'].set_visible(False)
+    ax_histx.set_ylabel('trait weight')
+    
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.energy_costs[active_type_indices], marker='D', zorder=0, color="None", edgecolor='tab:red')
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.xi_cost_terms[active_type_indices], marker='|', color='tab:brown', zorder=98)
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.chi_cost_terms[active_type_indices], marker='|', color='#333333')
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.J_cost_terms[active_type_indices], marker='|', color='tab:purple', zorder=99)
+    # ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=strainpool_system.get_fitness(t=0)[active_type_indices], marker='s', zorder=1, color='None', edgecolor='tab:green')
+    ax_costs.set_xlim(xmin=0, xmax=max(np.max(type_set.energy_costs), np.max(strainpool_system.get_fitness(t=0))))
+    ax_costs.tick_params(axis='y', left=True, labelleft=False)
+    ax_costs.spines['top'].set_visible(False)
+    ax_costs.spines['right'].set_visible(False)
+    ax_costs.set_xlabel('costs/fitness')
+
+    fig.tight_layout()
+    
+    return fig, [ax_pheno, ax_histx, ax_histy, ax_costs]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

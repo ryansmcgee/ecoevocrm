@@ -439,8 +439,11 @@ class ConsumerResourceSystem():
         mutant_abundance = np.maximum(1/mutant_fitness, 1) # forcing abundance of new types to be at least 1, this is a Ryan addition (perhaps controversial)
         # Get the index of the parent of the selected mutant:
         parent_idx       = mutant_idx // self.type_set.num_traits
+        # print(self.type_set.type_ids)
+        # print(mutant_type_id)
         #----------------------------------
         if(mutant_type_id in self.type_set.type_ids):
+            # print("pre-existing")
             # This "mutant" is a pre-existing type in the population; get its index:
             preexisting_type_idx = np.where(np.array(self.type_set.type_ids) == mutant_type_id)[0][0]
             # Add abundance equal to the mutant's establishment abundance to the pre-existing type:
@@ -448,6 +451,7 @@ class ConsumerResourceSystem():
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx)-mutant_abundance, 1))
         else:
+            # print("new mutant type", mutant.sigma)
             # Add the mutant to the population at an establishment abundance equal to 1/dfitness:
             self.add_type(mutant, abundance=mutant_abundance, parent_index=parent_idx)
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
@@ -547,9 +551,21 @@ class ConsumerResourceSystem():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_extant_type_set(self, type_set=None):
+    def get_extant_type_set(self, type_set=None, t=None, t_index=None):
+        t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
         type_set = self.type_set if type_set is None else type_set
-        return type_set.get_type(self.extant_type_indices)
+        #----------------------------------
+        if(t_idx == -1):
+            return type_set.get_type(self.extant_type_indices)
+        else:
+            _extant_type_indices = np.where(self.N_series[:, t_idx] > 0)[0]
+            return type_set.get_type(_extant_type_indices)
+
+
+    def get_extant_type_indices(self, t=None, t_index=None):
+        t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
+        #----------------------------------
+        return np.where(self.N_series[:, t_idx] > 0)[0]
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -591,37 +607,39 @@ class ConsumerResourceSystem():
         for param in params:
             if(param == 'b'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.b, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.b = (self.type_set.b * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.b * perturb_vals) if mode == 'multiplicative' else (self.type_set.b + perturb_vals) if mode == 'additive' else self.type_set.b
+                self.type_set.b = (self.type_set.b * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.b * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.b + perturb_vals) if mode == 'additive' else self.type_set.b
             elif(param == 'k'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.k, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.k = (self.type_set.k * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.k * perturb_vals) if mode == 'multiplicative' else (self.type_set.k + perturb_vals) if mode == 'additive' else self.type_set.k
+                # print("perturb_vals", perturb_vals)
+                self.type_set.k = (self.type_set.k * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.k * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.k + perturb_vals) if mode == 'additive' else self.type_set.k
+                # print("self.type_set.k", self.type_set.k)
             elif(param == 'eta'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.eta, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.eta = (self.type_set.eta * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.eta * perturb_vals) if mode == 'multiplicative' else (self.type_set.eta + perturb_vals) if mode == 'additive' else self.type_set.eta
+                self.type_set.eta = (self.type_set.eta * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.eta * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.eta + perturb_vals) if mode == 'additive' else self.type_set.eta
             elif(param == 'l'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.l, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.l = (self.type_set.l * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.l * perturb_vals) if mode == 'multiplicative' else (self.type_set.l + perturb_vals) if mode == 'additive' else self.type_set.l
+                self.type_set.l = (self.type_set.l * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.l * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.l + perturb_vals) if mode == 'additive' else self.type_set.l
             elif(param == 'g'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.g, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.g = (self.type_set.g * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.g * perturb_vals) if mode == 'multiplicative' else (self.type_set.g + perturb_vals) if mode == 'additive' else self.type_set.g
+                self.type_set.g = (self.type_set.g * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.g * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.g + perturb_vals) if mode == 'additive' else self.type_set.g
             elif(param == 'xi'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.xi, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.xi = (self.type_set.xi * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.xi * perturb_vals) if mode == 'multiplicative' else (self.type_set.xi + perturb_vals) if mode == 'additive' else self.type_set.xi
+                self.type_set.xi = (self.type_set.xi * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.xi * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.xi + perturb_vals) if mode == 'additive' else self.type_set.xi
             elif(param == 'chi'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.chi, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.chi = (self.type_set.chi * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.chi * perturb_vals) if mode == 'multiplicative' else (self.type_set.chi + perturb_vals) if mode == 'additive' else self.type_set.chi
+                self.type_set.chi = (self.type_set.chi * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.chi * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.chi + perturb_vals) if mode == 'additive' else self.type_set.chi
             elif(param == 'mu'): 
                 perturb_vals    = utils.get_perturbations(self.type_set.mu, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.mu = (self.type_set.mu * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.type_set.mu * perturb_vals) if mode == 'multiplicative' else (self.type_set.mu + perturb_vals) if mode == 'additive' else self.type_set.mu
+                self.type_set.mu = (self.type_set.mu * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.mu * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.mu + perturb_vals) if mode == 'additive' else self.type_set.mu
             elif(param == 'rho'): 
                 perturb_vals    = utils.get_perturbations(self.resource_set.rho, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.resource_set.rho = (self.resource_set.rho * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.rho * perturb_vals) if mode == 'multiplicative' else (self.resource_set.rho + perturb_vals) if mode == 'additive' else self.resource_set.rho
+                self.resource_set.rho = (self.resource_set.rho * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.rho * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.rho + perturb_vals) if mode == 'additive' else self.resource_set.rho
             elif(param == 'tau'): 
                 perturb_vals    = utils.get_perturbations(self.resource_set.tau, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.resource_set.tau = (self.resource_set.tau * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.tau * perturb_vals) if mode == 'multiplicative' else (self.resource_set.tau + perturb_vals) if mode == 'additive' else self.resource_set.tau
+                self.resource_set.tau = (self.resource_set.tau * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.tau * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.tau + perturb_vals) if mode == 'additive' else self.resource_set.tau
             elif(param == 'omega'): 
                 perturb_vals    = utils.get_perturbations(self.resource_set.omega, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.resource_set.omega = (self.resource_set.omega * (1 + perturb_vals)) if mode == 'multiplicative_proportional' else (self.resource_set.omega * perturb_vals) if mode == 'multiplicative' else (self.resource_set.omega + perturb_vals) if mode == 'additive' else self.resource_set.omega
+                self.resource_set.omega = (self.resource_set.omega * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.omega * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.omega + perturb_vals) if mode == 'additive' else self.resource_set.omega
         #----------------------------------
         return self
 
@@ -631,6 +649,7 @@ class ConsumerResourceSystem():
     def get_fitness(self, t=None, t_index=None):
         t_idx        = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
         return self.growth_rate(self.N_series[:, t_idx], self.R_series[:, t_idx], self.type_set.sigma, self.type_set.b, self.type_set.k, self.type_set.eta, self.type_set.l, self.type_set.g, self.type_set.energy_costs, self.resource_set.omega, self.resource_consumption_mode)
+
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
