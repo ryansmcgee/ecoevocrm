@@ -11,7 +11,10 @@ class ResourceSet():
                        rho   = 0,
                        tau   = 0,
                        omega = 1,
-                       D     = None ):
+                       alpha = 0,
+                       theta = 0,
+                       phi   = 0,
+                       D     = None, ):
 
         # Determine the number of resources:
         if(isinstance(rho, (list, np.ndarray))):
@@ -29,6 +32,9 @@ class ResourceSet():
         self.rho   = utils.reshape(rho,   shape=(1, self.num_resources))
         self.tau   = utils.reshape(tau,   shape=(1, self.num_resources))
         self.omega = utils.reshape(omega, shape=(1, self.num_resources))
+        self.alpha = utils.reshape(alpha, shape=(1, self.num_resources))
+        self.theta = utils.reshape(theta, shape=(1, self.num_resources))
+        self.phi   = utils.reshape(phi,   shape=(1, self.num_resources))
         self.D     = utils.reshape(D,     shape=(self.num_resources, self.num_resources)) if D is not None else None
 
 
@@ -48,7 +54,7 @@ class ResourceSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_resource_id(self, index):
-        return hash((self.rho[index], self.tau[index], self.omega[index]))
+        return hash((self.rho[index], self.tau[index], self.omega[index], self.alpha[index], self.theta[index], self.phi[index]))
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,6 +67,9 @@ class ResourceSet():
                     'rho':           self.rho,
                     'tau':           self.tau,
                     'omega':         self.omega,
+                    # 'alpha':         self.alpha,
+                    # 'theta':         self.theta,
+                    # 'phi':           self.phi,
                     'D':             self.D}
             # return (self.num_resources, self.rho, self.tau, self.omega, self.D)
         else:
@@ -68,6 +77,9 @@ class ResourceSet():
                     'rho':           self.rho[resource_idx],
                     'tau':           self.tau[resource_idx],
                     'omega':         self.omega[resource_idx],
+                    # 'alpha':         self.alpha[resource_idx],
+                    # 'theta':         self.theta[resource_idx],
+                    # 'phi':           self.phi[resource_idx],
                     'D':             self.D[resource_idx,:]}
             # return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
         
