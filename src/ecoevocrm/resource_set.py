@@ -9,7 +9,7 @@ class ResourceSet():
 
     def __init__(self, num_resources=None,
                        rho   = 0,
-                       tau   = 0,
+                       tau   = 1,
                        omega = 1,
                        alpha = 0,
                        theta = 0,
@@ -67,9 +67,9 @@ class ResourceSet():
                     'rho':           self.rho,
                     'tau':           self.tau,
                     'omega':         self.omega,
-                    # 'alpha':         self.alpha,
-                    # 'theta':         self.theta,
-                    # 'phi':           self.phi,
+                    'alpha':         self.alpha,
+                    'theta':         self.theta,
+                    'phi':           self.phi,
                     'D':             self.D}
             # return (self.num_resources, self.rho, self.tau, self.omega, self.D)
         else:
@@ -77,9 +77,9 @@ class ResourceSet():
                     'rho':           self.rho[resource_idx],
                     'tau':           self.tau[resource_idx],
                     'omega':         self.omega[resource_idx],
-                    # 'alpha':         self.alpha[resource_idx],
-                    # 'theta':         self.theta[resource_idx],
-                    # 'phi':           self.phi[resource_idx],
+                    'alpha':         self.alpha[resource_idx],
+                    'theta':         self.theta[resource_idx],
+                    'phi':           self.phi[resource_idx],
                     'D':             self.D[resource_idx,:]}
             # return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
         
