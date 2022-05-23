@@ -13,6 +13,8 @@ def matrix_plot(mat, ax=None, cmap=None, vmin=None, vmax=None, center=None, cbar
                 square=True, robust=False, linewidths=0, linecolor='white', 
                 xticklabels='auto', yticklabels='auto', mask=None, annot=None, fmt='.2g', annot_kws=None):
     
+    mat = np.atleast_2d(mat)
+
     if(cmap is None):
         if(np.any(mat < 0)):
             cmap   = 'RdBu'
@@ -112,6 +114,41 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
 
     if(log_x_axis):
         ax.set_xscale('log')
+
+    return ax
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def resource_plot(system, ax=None, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False, stacked=False, relative=False, resource_colors=None, palette='hls', linewidth=None, edgecolor=None, legend=True):
+
+    if(t_max is None):
+        t_max = np.max(system.t_series)
+
+    if(t_downsample == 'default'):
+        t_downsample = max(int((len(system.t_series)//10000)+1), 1)
+    elif(t_downsample is None):
+        t_downsample = 1
+
+    resource_colors = sns.color_palette(palette, system.num_resources) if resource_colors is None else resource_colors
+    
+    ax = plt.axes() if ax is None else ax
+
+    if(stacked):
+        if(relative):
+            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip((system.R_series/np.sum(system.R_series, axis=0))[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=resource_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+        else:
+            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip(system.R_series[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='sym', colors=resource_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+    else:
+        for i in range(system.num_resources):
+            ax.plot(system.t_series[system.t_series < t_max][::t_downsample], system.R_series[:, system.t_series < t_max][i, ::t_downsample], color=resource_colors[i], label=f"resource {i+1}")
+        if(legend):
+            ax.legend()
+
+    if(log_x_axis):
+        ax.set_xscale('log')
+    if(log_y_axis):
+        ax.set_yscale('log')
 
     return ax
 

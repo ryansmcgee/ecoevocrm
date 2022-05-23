@@ -53,6 +53,18 @@ class ResourceSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    @property
+    def M(self):
+        # M_ij = D_ij * w_j/w_i
+        if(self.D is not None):
+            W = np.tile(self.omega, (self.num_resources, 1))
+            return self.D * W/W.T
+        else:
+            return None
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     def get_resource_id(self, index):
         return hash((self.rho[index], self.tau[index], self.omega[index], self.alpha[index], self.theta[index], self.phi[index]))
 
@@ -70,7 +82,7 @@ class ResourceSet():
                     'alpha':         self.alpha,
                     'theta':         self.theta,
                     'phi':           self.phi,
-                    'D':             self.D}
+                    'M':             self.M}
             # return (self.num_resources, self.rho, self.tau, self.omega, self.D)
         else:
             return {'num_resources': 1,
@@ -80,7 +92,7 @@ class ResourceSet():
                     'alpha':         self.alpha[resource_idx],
                     'theta':         self.theta[resource_idx],
                     'phi':           self.phi[resource_idx],
-                    'D':             self.D[resource_idx,:]}
+                    'M':             self.M[resource_idx,:]}
             # return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
         
 
