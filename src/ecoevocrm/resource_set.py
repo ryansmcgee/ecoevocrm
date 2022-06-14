@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.interpolate
 
 import ecoevocrm.utils as utils
 
@@ -7,18 +8,24 @@ import ecoevocrm.utils as utils
 
 class ResourceSet():
 
-    def __init__(self, num_resources=None,
-                       rho   = 0,
-                       tau   = 1,
-                       omega = 1,
-                       alpha = 0,
-                       theta = 0,
-                       phi   = 0,
-                       D     = None, ):
+    # Define Class constants:
+    RESOURCE_INFLUX_CONSTANT          = 0
+    RESOURCE_INFLUX_TEMPORAL          = 1
+
+    def __init__(self, num_resources = None,
+                       rho           = 0,
+                       tau           = 1,
+                       omega         = 1,
+                       alpha         = 0,
+                       theta         = 0,
+                       phi           = 0,
+                       D             = None ):
 
         # Determine the number of resources:
         if(isinstance(rho, (list, np.ndarray))):
             self.num_resources = len(rho)
+        elif(isinstance(rho, scipy.interpolate.interpolate.interp1d)):
+            self.num_resources = len(rho(0).ravel())
         elif(isinstance(omega, (list, np.ndarray))):
             self.num_resources = len(omega)
         elif(isinstance(tau, (list, np.ndarray))):
@@ -29,12 +36,17 @@ class ResourceSet():
             utils.error("Error in ResourceSet __init__(): Number of resources must be specified by providing a) a value for num_resources, or b) lists for rho/tau/omega.")
 
         # Initialize resource parameters:
-        self.rho   = utils.reshape(rho,   shape=(1, self.num_resources))
-        self.tau   = utils.reshape(tau,   shape=(1, self.num_resources))
-        self.omega = utils.reshape(omega, shape=(1, self.num_resources))
-        self.alpha = utils.reshape(alpha, shape=(1, self.num_resources))
-        self.theta = utils.reshape(theta, shape=(1, self.num_resources))
-        self.phi   = utils.reshape(phi,   shape=(1, self.num_resources))
+        if(isinstance(rho, scipy.interpolate.interpolate.interp1d)):
+            self._rho = rho
+            self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_TEMPORAL
+        else:
+            self._rho = utils.reshape(rho, shape=(1, self.num_resources)).ravel()
+            self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_CONSTANT
+        self.tau   = utils.reshape(tau,   shape=(1, self.num_resources)).ravel()
+        self.omega = utils.reshape(omega, shape=(1, self.num_resources)).ravel()
+        self.alpha = utils.reshape(alpha, shape=(1, self.num_resources)).ravel()
+        self.theta = utils.reshape(theta, shape=(1, self.num_resources)).ravel()
+        self.phi   = utils.reshape(phi,   shape=(1, self.num_resources)).ravel()
         self.D     = utils.reshape(D,     shape=(self.num_resources, self.num_resources)) if D is not None else None
 
 
@@ -62,11 +74,24 @@ class ResourceSet():
         else:
             return None
 
+    @property
+    def rho(self):
+        return self._rho
+
+    @rho.setter
+    def rho(self, vals):
+        if(isinstance(vals, scipy.interpolate.interpolate.interp1d)):
+            self._rho = vals
+            self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_TEMPORAL
+        else:
+            self._rho = utils.reshape(vals, shape=(1, self.num_resources)).ravel()
+            self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_CONSTANT
+
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_resource_id(self, index):
-        return hash((self.rho[index], self.tau[index], self.omega[index], self.alpha[index], self.theta[index], self.phi[index]))
+        return hash((self._rho[index], self.tau[index], self.omega[index], self.alpha[index], self.theta[index], self.phi[index]))
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -76,24 +101,24 @@ class ResourceSet():
         resource_idx = np.where(self.resource_ids==resource_id)[0] if resource_id is not None else index
         if(resource_idx is None):
             return {'num_resources': self.num_resources,
-                    'rho':           self.rho,
+                    'rho':           self._rho,
                     'tau':           self.tau,
                     'omega':         self.omega,
                     'alpha':         self.alpha,
                     'theta':         self.theta,
                     'phi':           self.phi,
                     'M':             self.M}
-            # return (self.num_resources, self.rho, self.tau, self.omega, self.D)
+            # return (self.num_resources, self._rho, self.tau, self.omega, self.D)
         else:
             return {'num_resources': 1,
-                    'rho':           self.rho[resource_idx],
+                    'rho':           self._rho[resource_idx],
                     'tau':           self.tau[resource_idx],
                     'omega':         self.omega[resource_idx],
                     'alpha':         self.alpha[resource_idx],
                     'theta':         self.theta[resource_idx],
                     'phi':           self.phi[resource_idx],
                     'M':             self.M[resource_idx,:]}
-            # return (1, self.rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
+            # return (1, self._rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
         
 
 

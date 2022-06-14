@@ -174,7 +174,7 @@ def Lstar_types_plot(system, ax=None, figsize=(7,5)):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cutoff=None):
+def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cutoff=None, figsize=(10, 10)):
     
     type_set = strainpool_system.type_set
     
@@ -204,7 +204,7 @@ def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cu
     rect_histy = [left + pheno_width + spacing, bottom, histy_width, pheno_height]
     rect_costs = [left + pheno_width + spacing + histy_width + spacing, bottom, costs_width, pheno_height]    
 
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure(figsize=figsize)
 
     ax_pheno = fig.add_axes(rect_pheno)
     ax_histx = fig.add_axes(rect_histx, sharex=ax_pheno)

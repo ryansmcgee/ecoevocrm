@@ -439,6 +439,9 @@ class TypeSet():
         type_order   = np.argsort(self.lineage_ids) if order is None else order
         if(len(type_order) < self.num_types):
             utils.error("Error in TypeSet.reorder_types(): The ordering provided has fewer indices than types.")
+        print("type_order:\n", type_order[:100])
+        print("self._lineage_ids (pre):\n", self._lineage_ids[:100])
+        print("self._parent_indices (pre):\n", self._parent_indices[:100])
         #----------------------------------
         self._sigma = self._sigma.reorder(type_order)
         self._beta  = self._beta.reorder(type_order)  if isinstance(self._beta,  utils.ExpandableArray) else self._beta
@@ -450,10 +453,34 @@ class TypeSet():
         self._chi   = self._chi.reorder(type_order)   if isinstance(self._chi,   utils.ExpandableArray) else self._chi
         self._mu    = self._mu.reorder(type_order)    if isinstance(self._mu,    utils.ExpandableArray) else self._mu
         self._energy_costs   = None # reset to recalculate upon next reference
-        self._parent_indices = np.array(self.parent_indices)[type_order].tolist()
         self._type_ids       = np.array(self._type_ids)[type_order].tolist() if self._type_ids is not None else None
         self._lineage_ids    = np.array(self._lineage_ids)[type_order].tolist() if self._lineage_ids is not None else None
         self._mutant_indices = self._mutant_indices.reorder(type_order) if self._mutant_indices is not None else None
+        #----------------------------------
+        # print("self._lineage_ids (post):\n", self._lineage_ids[:100])
+        # Parent indices require special handling because simply reordering the parent indices list makes the index pointers point to incorrect places relative to the reordered lists
+        # - First, do a simple reordering of the parent indices:
+        _parent_indices_tempreorder = np.array(self._parent_indices)[type_order].tolist()
+        # print("_parent_indices_tempreorder:\n", _parent_indices_tempreorder[:100])
+        
+        # _parent_indices_updated = []
+
+
+        self._parent_indices = [np.where(type_order == pidx)[0][0] if pidx != None else None for pidx in _parent_indices_tempreorder]
+        # for i, pidx in enumerate(_parent_indices_tempreorder):
+        #     if(pidx is None):
+        #         _parent_indices_updated.append(None)
+        #     print(f"i={i}, {self._lineage_ids[i]}")
+        #     # print(type_order[i], type_order[pidx])
+        #     # print(f"pidx={pidx}, -- {type_order[pidx]}, {self._lineage_ids[type_order[pidx]]}")
+        #     print(f"pidx={pidx}, -- {np.where(type_order == pidx)[0][0]}, {self._lineage_ids[np.where(type_order == pidx)[0][0]]}")
+        #     print()
+
+        # print("self._parent_indices (post):\n", self._parent_indices[:100])
+
+        # _parent_indices_tempreorder = [i if i is not None else -1 for i in _parent_indices_tempreorder]
+        # # - Next, use the new type_order to figure out the type indices that the reordered parent_indices are trying to point to:
+        # self._parent_indices = [i if i != -1 else None for i in type_order[_parent_indices_tempreorder]]
         #----------------------------------
         return
 
