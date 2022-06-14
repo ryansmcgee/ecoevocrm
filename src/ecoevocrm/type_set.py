@@ -439,9 +439,9 @@ class TypeSet():
         type_order   = np.argsort(self.lineage_ids) if order is None else order
         if(len(type_order) < self.num_types):
             utils.error("Error in TypeSet.reorder_types(): The ordering provided has fewer indices than types.")
-        print("type_order:\n", type_order[:100])
-        print("self._lineage_ids (pre):\n", self._lineage_ids[:100])
-        print("self._parent_indices (pre):\n", self._parent_indices[:100])
+        # print("type_order:\n", type_order[:100])
+        # print("self._lineage_ids (pre):\n", self._lineage_ids[:100])
+        # print("self._parent_indices (pre):\n", self._parent_indices[:100])
         #----------------------------------
         self._sigma = self._sigma.reorder(type_order)
         self._beta  = self._beta.reorder(type_order)  if isinstance(self._beta,  utils.ExpandableArray) else self._beta
