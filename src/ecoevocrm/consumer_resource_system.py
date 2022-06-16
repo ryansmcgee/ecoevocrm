@@ -19,10 +19,6 @@ class ConsumerResourceSystem():
     # Define Class constants:
     RESOURCE_DYNAMICS_FASTEQ          = 0
     RESOURCE_DYNAMICS_EXPLICIT        = 1
-    RESOURCE_INFLUX_NONE              = 0
-    RESOURCE_INFLUX_CONSTANT          = 1
-    RESOURCE_INFLUX_SINUSOID          = 2
-    RESOURCE_INFLUX_RANDOMWALK        = 3
     RESOURCE_CROSSFEEDING_NONE        = 0
     RESOURCE_CROSSFEEDING_HOMOTYPES   = 1
     RESOURCE_CROSSFEEDING_HETEROTYPES = 2
@@ -51,14 +47,14 @@ class ConsumerResourceSystem():
                  theta         = 0,
                  phi           = 0,
                  D             = None,
-                 resource_dynamics_mode        = 'fast_resource_eq',
-                 resource_influx_mode          = 'none',
+                 resource_dynamics_mode        = 'fasteq',
                  threshold_min_abs_abundance   = 1,
                  threshold_min_rel_abundance   = 1e-6,
                  threshold_eq_abundance_change = 1e4,
                  threshold_precise_integrator  = 1e2,
                  check_event_low_abundance     = False,
                  convergent_lineages           = True,
+                 max_time_step                 = np.inf,
                  seed = None):
 
         #----------------------------------
@@ -142,6 +138,8 @@ class ConsumerResourceSystem():
         #----------------------------------
         self._t_series = utils.ExpandableArray([0], alloc_shape=(1, 1))
 
+        self.max_time_step = max_time_step
+
         #----------------------------------
         # Initialize event parameters:
         #----------------------------------
@@ -158,12 +156,6 @@ class ConsumerResourceSystem():
         #----------------------------------
         self.resource_dynamics_mode     = ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ if resource_dynamics_mode=='fasteq' \
                                             else ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT if resource_dynamics_mode=='explicit' \
-                                            else -1
-
-        self.resource_influx_mode       = ConsumerResourceSystem.RESOURCE_INFLUX_NONE if resource_influx_mode == 'none' \
-                                            else ConsumerResourceSystem.RESOURCE_INFLUX_CONSTANT if resource_influx_mode == 'constant' \
-                                            else ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID if resource_influx_mode == 'sinusoid' \
-                                            else ConsumerResourceSystem.RESOURCE_INFLUX_RANDOMWALK if resource_influx_mode == 'randomwalk' \
                                             else -1
 
         self.resource_crossfeeding_mode = ConsumerResourceSystem.RESOURCE_CROSSFEEDING_NONE if np.all(self.resource_set.D == 0) or np.all(self.type_set.lamda == 0) \
@@ -229,7 +221,7 @@ class ConsumerResourceSystem():
 
     @property
     def fitness(self):
-        return self.growth_rate(self.N, self.R, self.t, self.type_set.sigma, self.type_set.beta, self.type_set.kappa, self.type_set.eta, self.type_set.lamda, self.type_set.gamma, self.resource_set.rho, self.resource_set.tau, self.resource_set.omega, self.resource_set.alpha, self.resource_set.theta, self.resource_set.phi, self.type_set.energy_costs,  self.resource_dynamics_mode, self.resource_influx_mode) 
+        return self.growth_rate(self.N, self.R, self.t, self.type_set.sigma, self.type_set.beta, self.type_set.kappa, self.type_set.eta, self.type_set.lamda, self.type_set.gamma, self.resource_set.rho, self.resource_set.tau, self.resource_set.omega, self.resource_set.alpha, self.resource_set.theta, self.resource_set.phi, self.type_set.energy_costs,  self.resource_dynamics_mode, self.resource_set.resource_influx_mode) 
     
     @property
     def num_types(self):
@@ -288,6 +280,13 @@ class ConsumerResourceSystem():
             else:
                 _integration_method = integration_method
 
+            # Define the set of events that may trigger:
+            events = []
+            if(self.type_set.mu > 0):
+                events.append(self.event_mutation)
+            if(self.check_event_low_abundance):
+                events.append(self.event_low_abundance)
+
             #------------------------------
             # Integrate the system dynamics:
             #------------------------------
@@ -297,8 +296,9 @@ class ConsumerResourceSystem():
                                              args   = params,
                                              t_span = (self.t, self.t+T),
                                              t_eval = np.arange(start=self.t, stop=self.t+T+dt, step=dt) if dt is not None else None,
-                                             events = [self.event_mutation, self.event_low_abundance] if self.check_event_low_abundance else [self.event_mutation],
-                                             method = _integration_method )
+                                             events = events,
+                                             method = _integration_method,
+                                             max_step = self.max_time_step )
 
             #------------------------------
             # Update the system's trajectories with latest dynamics epoch:
@@ -309,9 +309,9 @@ class ConsumerResourceSystem():
             
             R_epoch = sol.y[-1-self.resource_set.num_resources:-1]
             
-            self._t_series.add(sol.t, axis=1)
-            self._N_series.add(N_epoch, axis=1)
-            self._R_series.add(R_epoch, axis=1)
+            self._t_series.add(sol.t[1:], axis=1)
+            self._N_series.add(N_epoch[:, 1:], axis=1)
+            self._R_series.add(R_epoch[:, 1:], axis=1)
             
             t_elapsed = self.t - t_start
 
@@ -362,7 +362,9 @@ class ConsumerResourceSystem():
 
         #------------------------------
 
-        resource_influx_rate  = ( rho + ( alpha*np.sin(theta * (t + phi)) if self.resource_influx_mode == ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID and np.any(alpha > 0) and np.any(theta > 0) else 0 ) ).ravel()
+        # resource_influx_rate  = ( rho + ( alpha*np.sin(theta * (t + phi)) if resource_influx_mode == ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID and np.any(alpha > 0) and np.any(theta > 0) else 0 ) ).ravel()
+        resource_influx_rate = rho(t) if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else rho
+        # print(resource_influx_rate)
 
         #------------------------------
 
@@ -403,11 +405,19 @@ class ConsumerResourceSystem():
                     uptake_coeffs = uptake_coeffs * omega
         consumption_coeffs   = consumption_rates_bytrait/kappa if consumption_coeffs is None else consumption_coeffs
         resource_decay_rate  = 1/tau if resource_decay_rate is None else resource_decay_rate
-        resource_influx_rate = rho + ( alpha*np.sin(theta * (t + phi)) if resource_influx_mode == ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID and np.any(alpha > 0) and np.any(theta > 0) else 0 )
+        # resource_influx_rate = rho + ( alpha*np.sin(theta * (t + phi)) if resource_influx_mode == ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID and np.any(alpha > 0) and np.any(theta > 0) else 0 )
+        resource_influx_rate = rho(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else rho
         #------------------------------
+        # print("resource_influx_mode", resource_influx_mode)
+        # print("resource_dynamics_mode", resource_dynamics_mode)
         if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+            # print("resource_decay_rate", resource_decay_rate, resource_decay_rate.shape)
+            # print("np.einsum('ij,i->j', consumption_coeffs, N)", np.einsum('ij,i->j', consumption_coeffs, N), np.einsum('ij,i->j', consumption_coeffs, N).shape)
+            # print("resource_influx_rate / (resource_decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))", resource_influx_rate / (resource_decay_rate + np.einsum('ij,i->j', consumption_coeffs, N)), (resource_influx_rate / (resource_decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))).shape)
             resource_uptake = resource_influx_rate / (resource_decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))
-            energy_uptake   = np.einsum('ij,ij->i', uptake_coeffs, resource_uptake)
+            # print("uptake_coeffs", uptake_coeffs, uptake_coeffs.shape)
+            # print("resource_uptake", resource_uptake, resource_uptake.shape)
+            energy_uptake   = np.einsum('ij,j->i', uptake_coeffs, resource_uptake)
             energy_surplus  = energy_uptake - energy_costs
             growth_rate     = gamma * energy_surplus
         elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
@@ -415,6 +425,7 @@ class ConsumerResourceSystem():
             energy_surplus = energy_uptake - energy_costs
             growth_rate    = gamma * energy_surplus
         #------------------------------
+        # exit()
         return growth_rate
 
 
@@ -426,7 +437,8 @@ class ConsumerResourceSystem():
 
         consumption_coeffs   = consumption_rates_bytrait/kappa if consumption_coeffs is None else consumption_coeffs
         resource_decay_rate  = (1/tau).ravel() if resource_decay_rate is None else resource_decay_rate
-        resource_influx_rate = (rho + ( alpha*np.sin(theta * (t + phi)) if resource_influx_mode == ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID and np.any(alpha > 0) and np.any(theta > 0) else 0 )).ravel()
+        # resource_influx_rate = (rho + ( alpha*np.sin(theta * (t + phi)) if resource_influx_mode == ConsumerResourceSystem.RESOURCE_INFLUX_SINUSOID and np.any(alpha > 0) and np.any(theta > 0) else 0 )).ravel()
+        resource_influx_rate = rho(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else rho
         #------------------------------
         if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
             dRdt = np.zeros(len(R))
@@ -489,6 +501,8 @@ class ConsumerResourceSystem():
         mutant_idx       = np.random.choice(mutant_indices, p=mutant_drawprobs)
         # Retrieve the mutant and some of its properties:
         mutant           = self.mutant_set.get_type(mutant_idx)
+        # print()
+        # print(mutant.sigma)
         mutant_type_id   = self.mutant_set.get_type_id(mutant_idx)
         mutant_fitness   = self.mutant_fitnesses[np.argmax(mutant_indices == mutant_idx)]
         mutant_abundance = np.maximum(1/mutant_fitness, 1) # forcing abundance of new types to be at least 1, this is a Ryan addition (perhaps controversial)
@@ -520,7 +534,7 @@ class ConsumerResourceSystem():
         R = self.R
         t = self.t
         #----------------------------------
-        growth_rate = ConsumerResourceSystem.growth_rate(N, R, t, self.type_set.sigma, self.type_set.beta, self.type_set.kappa, self.type_set.eta, self.type_set.lamda, self.type_set.gamma, self.resource_set.rho, self.resource_set.tau, self.resource_set.omega, self.resource_set.alpha, self.resource_set.theta, self.resource_set.phi, self.resource_set.M, self.type_set.energy_costs,  self.resource_dynamics_mode, self.resource_influx_mode, self.resource_crossfeeding_mode) 
+        growth_rate = ConsumerResourceSystem.growth_rate(N, R, t, self.type_set.sigma, self.type_set.beta, self.type_set.kappa, self.type_set.eta, self.type_set.lamda, self.type_set.gamma, self.resource_set.rho, self.resource_set.tau, self.resource_set.omega, self.resource_set.alpha, self.resource_set.theta, self.resource_set.phi, self.resource_set.M, self.type_set.energy_costs,  self.resource_dynamics_mode, self.resource_set.resource_influx_mode, self.resource_crossfeeding_mode) 
         #----------------------------------
         lost_types = np.where( (N < 0) | ((N > 0) & (growth_rate < 0) & ((N < self.threshold_min_abs_abundance) | (N/np.sum(N) < self.threshold_min_rel_abundance))) )[0]
         for i in lost_types:
@@ -602,7 +616,7 @@ class ConsumerResourceSystem():
         return (tuple(type_params_wmuts.values()) 
                 + tuple(resource_params.values())
                 + (uptake_coeffs, consumption_coeffs, resource_decay_rate)
-                + (self.resource_dynamics_mode, self.resource_influx_mode, self.resource_crossfeeding_mode))
+                + (self.resource_dynamics_mode, self.resource_set.resource_influx_mode, self.resource_crossfeeding_mode))
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -719,9 +733,12 @@ class ConsumerResourceSystem():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_fitness(self, t=None, t_index=None):
-        t_idx        = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
-        return self.growth_rate(self.N_series[:, t_idx], self.R_series[:, t_idx], self.t_series[t_idx], self.type_set.sigma, self.type_set.beta, self.type_set.kappa, self.type_set.eta, self.type_set.lamda, self.type_set.gamma, self.resource_set.rho, self.resource_set.tau, self.resource_set.omega, self.resource_set.alpha, self.resource_set.theta, self.resource_set.phi, self.resource_set.M, self.type_set.energy_costs,  self.resource_dynamics_mode, self.resource_influx_mode, self.resource_crossfeeding_mode) 
+    def get_fitness(self, t=None, t_index=None, N=None, R=None):
+        t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
+        _N = self.N_series[:, t_idx] if N is None else N
+        _R = self.R_series[:, t_idx] if R is None else R
+        #----------------------------------
+        return self.growth_rate(_N, _R, self.t_series[t_idx], self.type_set.sigma, self.type_set.beta, self.type_set.kappa, self.type_set.eta, self.type_set.lamda, self.type_set.gamma, self.resource_set.rho, self.resource_set.tau, self.resource_set.omega, self.resource_set.alpha, self.resource_set.theta, self.resource_set.phi, self.resource_set.M, self.type_set.energy_costs,  self.resource_dynamics_mode, self.resource_set.resource_influx_mode, self.resource_crossfeeding_mode) 
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

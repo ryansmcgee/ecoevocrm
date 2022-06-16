@@ -65,13 +65,13 @@ def get_functional_group_abundances(system, trait_subset, t=None, t_index=None, 
 def turnover_metric(abundances_t0, abundances_tf, inverse=False):
     # Based on: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2664.12959
     turnover = np.sum(np.power((abundances_t0 - abundances_tf), 2)) / ( np.sum(np.power(abundances_t0, 2)) + np.sum(np.power(abundances_t0, 2)) - np.sum(abundances_t0 * abundances_tf) )
-    if(turnover > 1 or turnover < 0):
-        print('abundances_t0\n', abundances_t0)
-        print('abundances_tf\n', abundances_tf)
-        print('(abundances_t0 - abundances_tf)\n', (abundances_t0 - abundances_tf))
-        print('np.power((abundances_t0 - abundances_tf), 2)\n', np.power((abundances_t0 - abundances_tf), 2))
-        print('np.sum(np.power((abundances_t0 - abundances_tf), 2))\n', np.sum(np.power((abundances_t0 - abundances_tf), 2)))
-        print('turnover', turnover)
+    # if(turnover > 1 or turnover < 0):
+        # print('abundances_t0\n', abundances_t0)
+        # print('abundances_tf\n', abundances_tf)
+        # print('(abundances_t0 - abundances_tf)\n', (abundances_t0 - abundances_tf))
+        # print('np.power((abundances_t0 - abundances_tf), 2)\n', np.power((abundances_t0 - abundances_tf), 2))
+        # print('np.sum(np.power((abundances_t0 - abundances_tf), 2))\n', np.sum(np.power((abundances_t0 - abundances_tf), 2)))
+        # print('turnover', turnover)
         # exit()
     return turnover if not inverse else (1 - turnover)
 
@@ -87,6 +87,8 @@ def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False):
     for i, clade_id in enumerate(clade_abds_tf_dict.keys()):
         if(clade_id not in clade_abds_t0_dict):
             clade_abds_t0_dict[clade_id] = 0
+    print('clade_abds_t0_dict', clade_abds_t0_dict)
+    print('clade_abds_tf_dict', clade_abds_tf_dict)
     #----------------------------------
     clade_abds_t0    = np.array([clade_abds_t0_dict[clade_id] for clade_id in sorted(clade_abds_t0_dict.keys())])
     clade_abds_tf    = np.array([clade_abds_tf_dict[clade_id] for clade_id in sorted(clade_abds_tf_dict.keys())])
@@ -94,11 +96,11 @@ def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False):
     clade_relabds_tf = clade_abds_tf/np.sum(clade_abds_tf)
     #----------------------------------
     tm = turnover_metric(clade_relabds_t0, clade_relabds_tf, inverse=inverse)
-    if(tm > 1 or tm < 0):
-        print(clade_abds_t0_dict)
-        print(clade_abds_t0)
-        print(clade_abds_tf_dict)
-        print(clade_abds_tf)
+    # if(tm > 1 or tm < 0):
+        # print(clade_abds_t0_dict)
+        # print(clade_abds_t0)
+        # print(clade_abds_tf_dict)
+        # print(clade_abds_tf)
     return tm
 
 
@@ -120,11 +122,11 @@ def functional_group_turnover(system, trait_subset, t0, tf, inverse=False):
     group_relabds_tf = group_abds_tf/np.sum(group_abds_tf)
     #----------------------------------
     tm = turnover_metric(group_relabds_t0, group_relabds_tf, inverse=inverse)
-    if(tm > 1 or tm < 0):
-        print(group_abds_t0_dict)
-        print(group_abds_t0)
-        print(group_abds_tf_dict)
-        print(group_abds_tf)
+    # if(tm > 1 or tm < 0):
+        # print(group_abds_t0_dict)
+        # print(group_abds_t0)
+        # print(group_abds_tf_dict)
+        # print(group_abds_tf)
     return tm
     
     

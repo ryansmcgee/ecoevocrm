@@ -450,10 +450,13 @@ class TypeSet():
         self._chi   = self._chi.reorder(type_order)   if isinstance(self._chi,   utils.ExpandableArray) else self._chi
         self._mu    = self._mu.reorder(type_order)    if isinstance(self._mu,    utils.ExpandableArray) else self._mu
         self._energy_costs   = None # reset to recalculate upon next reference
-        self._parent_indices = np.array(self.parent_indices)[type_order].tolist()
         self._type_ids       = np.array(self._type_ids)[type_order].tolist() if self._type_ids is not None else None
         self._lineage_ids    = np.array(self._lineage_ids)[type_order].tolist() if self._lineage_ids is not None else None
         self._mutant_indices = self._mutant_indices.reorder(type_order) if self._mutant_indices is not None else None
+        #----------------------------------
+        # Parent indices require special handling because simply reordering the parent indices list makes the index pointers point to incorrect places relative to the reordered lists
+        _parent_indices_tempreorder = np.array(self._parent_indices)[type_order].tolist()
+        self._parent_indices = [np.where(type_order == pidx)[0][0] if pidx != None else None for pidx in _parent_indices_tempreorder]
         #----------------------------------
         return
 

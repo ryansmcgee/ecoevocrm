@@ -161,6 +161,8 @@ def binary_combinations(num_digits, exclude_all_zeros=False):
     return combos if not exclude_all_zeros else combos[1:, :]
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def treat_as_list(val):
     if(not isinstance(val, (list, np.ndarray)) and val is not None):
         return [val]
@@ -170,11 +172,15 @@ def treat_as_list(val):
         return val
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def error(message, trigger_exit=True):
     print("\n"+message+"\n")
     if(trigger_exit):
         sys.exit()
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def get_perturbations(vals, dist, args, mode, element_wise):
     # dist == constant: args={'val': ...}
@@ -193,11 +199,63 @@ def get_perturbations(vals, dist, args, mode, element_wise):
     return perturb_vals
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def sinusoid_series(T, dt=0.1, amplitude=1, period=2*np.pi, phase=0, shift=0, L=1, return_interp=True):
+    amplitude = reshape(amplitude, shape=(1, L)).ravel()
+    period    = reshape(period, shape=(1, L)).ravel()
+    phase     = reshape(phase, shape=(1, L)).ravel()
+    shift     = reshape(shift, shape=(1, L)).ravel()
+    #--------------------------------
+    t_series  = np.arange(0, T, step=dt)
+    #--------------------------------
+    y_series = []
+    for i in range(L):
+        y = ((amplitude[i] * np.sin(period[i] * (t_series + phase[i]))) + shift[i]).ravel()
+        y_series.append(y)
+    y_series = np.array(y_series)
+    #--------------------------------
+    if(return_interp):
+        import scipy.interpolate
+        return scipy.interpolate.interp1d(t_series, y_series)
+    else:
+        return y_series, t_series
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def brownian_series(T, dt=1, lamda=1, eta_mean=0, eta_std=1, k=0, y0=0, v0=0, L=1, return_interp=True):
+    lamda    = reshape(lamda, shape=(1, L)).ravel()
+    eta_mean = reshape(eta_mean, shape=(1, L)).ravel()
+    eta_std  = reshape(eta_std, shape=(1, L)).ravel()
+    k        = reshape(k, shape=(1, L)).ravel()
+    y0       = reshape(y0, shape=(1, L)).ravel()
+    v0       = reshape(v0, shape=(1, L)).ravel()
+    #--------------------------------
+    t_series  = np.arange(0, T, step=dt)
+    #--------------------------------
+    y_series = []
+    for i in range(L):
+        y    = np.zeros_like(t_series)
+        y[0] = y0[i]
+        v      = np.zeros_like(t_series)
+        v[0]   = v0[i]
+        for t in range(len(t_series)-1):
+            dv     = -lamda[i]*v[t] + np.random.normal(eta_mean[i], eta_std[i]) - k[i]*(y[t]-y[0])
+            v[t+1] = v[t] + dv*dt
+            dy     = v[t+1]
+            y[t+1] = y[t] + dy*dt
+        y_series.append(y)
+    y_series = np.array(y_series)
+    #--------------------------------
+    if(return_interp):
+        import scipy.interpolate
+        return scipy.interpolate.interp1d(t_series, y_series)
+    else:
+        return y_series, t_series
 
 
-
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def get_boltzmann_temp_for_entropy(energy, target_entropy):
     import scipy
