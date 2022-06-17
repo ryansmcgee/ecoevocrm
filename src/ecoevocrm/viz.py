@@ -246,7 +246,89 @@ def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cu
 
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def tree_plot(system, ax=None, t_max=None, log_x_axis=False, log_y_axis=False, onlyOriginMutations=False, translucentLaterMutations=True): #I PLAN TO PUT THIS HERE
+    
+    #Potential further changes:
+    #-Can graph other quantities belonging to types besides cost on the y-axis (Alter the lines with "###" in them)
+    #-Can change the layaring of plot elements
+    
+    if(t_max is None):
+        t_max = np.max(system.t_series)
+    
+    ax = plt.axes() if ax is None else ax
+    
+    typeValueDict = {"0" : system.type_set.energy_costs[0]} ###can change this from energy_costs to change the y-axis
+
+    typeIndex=0
+    listOfPairedListsH = [] 
+    for typeSeries in system.N_series:
+        xpointsH = [] #horizontal
+        ypointsH = [] #horizontal
+        pairList = [xpointsH,ypointsH]
+        listOfPairedListsH.append(pairList) #storage for graphing horizontal lines
+
+        firstTimeIndex = 0
+        if(typeSeries[firstTimeIndex] != 0): #horizontal lines for first time step 
+            listOfPairedListsH[typeIndex][0].append(system.t_series[0])
+            value = system.type_set.energy_costs[typeIndex] ###can change this from energy_costs to change the y-axis
+            listOfPairedListsH[typeIndex][1].append(value)
+
+        typeIndex = typeIndex + 1
+
+        
+    timeIndex = 0
+    for time in system.t_series:
+        typeIndex = 0
+        for typeSeries in system.N_series:
+            if(timeIndex > 1): 
+                if(typeSeries[timeIndex] != 0 or typeSeries[timeIndex-1] != 0): #horizontal lines
+                    listOfPairedListsH[typeIndex][0].append(time)
+                    value = system.type_set.energy_costs[typeIndex] ###can change this from energy_costs to change the y-axis
+                    listOfPairedListsH[typeIndex][1].append(value)
+                if(typeSeries[timeIndex-1]==0 and typeSeries[timeIndex] != 0): #vertical lines and their markers
+                    parentTypeIndex = system.type_set.parent_indices[typeIndex]
+                    parentValue = system.type_set.energy_costs[parentTypeIndex] ###can change this from energy_costs to change the y-axis
+                    xpointsV = [time, time] #vertical
+                    ypointsV = [value, parentValue] #vertical
+                    if((value in typeValueDict.values()) == False): #only clearly graphing vertical lines and their markers if the value isnt stored
+                        plt.plot(xpointsV, ypointsV) #, color="blue"
+                        plt.plot(time, value, marker="o", markersize=4, color="magenta", alpha=0.2)
+                        plt.plot(time, parentValue, marker="o", markersize=4, color="black", alpha=0.2)
+                    if((value in typeValueDict.values()) == True): #faintly graphing vertical lines and their markers if the value is stored
+                        if(onlyOriginMutations == False and translucentLaterMutations == True): #find the best way to do this
+                            plt.plot(xpointsV, ypointsV, color="blue", alpha=0.09)
+                            plt.plot(time, value, marker="o", markersize=4, color="magenta", alpha=0.09)
+                            plt.plot(time, parentValue, marker="o", markersize=4, color="black", alpha=0.09)
+                        if(onlyOriginMutations == False and translucentLaterMutations == False):
+                            plt.plot(xpointsV, ypointsV)
+                            plt.plot(time, value, marker="o", markersize=4, color="magenta", alpha=0.09)
+                            plt.plot(time, parentValue, marker="o", markersize=4, color="black", alpha=0.09)
+                            
+                    typeValueDict[typeIndex] = value #Storing type,value pair so can graph a sinlge vertical line to a horizontal line
+
+                if(typeSeries[timeIndex-1] != 0 and typeSeries[timeIndex]==0): 
+                    plt.plot(time, value, marker="x", markersize=6, color="red", alpha=0.2) #marking deaths #Transparancy allows for seeing if multiple deaths are occuring at the same time
+
+                    if(typeIndex in typeValueDict and value in typeValueDict.values()): #Removing a type,value pair upon death 
+                        del typeValueDict[typeIndex]
+
+            typeIndex = typeIndex + 1
+        timeIndex = timeIndex + 1
+
+    typeIndex = 0
+    for typeSeries in system.N_series: #plotting horizontal lines
+        plt.plot(listOfPairedListsH[typeIndex][0], listOfPairedListsH[typeIndex][1])
+        typeIndex = typeIndex + 1
+        
+
+    if(log_x_axis):
+        ax.set_xscale('log')
+    if(log_y_axis):
+        ax.set_yscale('log')
+
+    return ax
 
 
 
