@@ -232,7 +232,7 @@ def brownian_series(T, dt=1, lamda=1, eta_mean=0, eta_std=1, k=0, y0=0, v0=0, L=
     y0       = reshape(y0, shape=(1, L)).ravel()
     v0       = reshape(v0, shape=(1, L)).ravel()
     #--------------------------------
-    t_series  = np.arange(0, T, step=dt)
+    t_series  = np.arange(0, T+dt, step=dt)
     #--------------------------------
     y_series = []
     for i in range(L):

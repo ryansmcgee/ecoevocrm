@@ -229,10 +229,15 @@ def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cu
     ax_histx.spines['right'].set_visible(False)
     ax_histx.set_ylabel('trait weight')
     
+    # print(active_type_indices)
+    # print(type_set.energy_costs)
+    # print(type_set.xi_cost_terms)
+    # print(type_set.chi_cost_terms)
+    # print(type_set.J_cost_terms)
     ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.energy_costs[active_type_indices], marker='D', zorder=0, color="None", edgecolor='tab:red')
-    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.xi_cost_terms[active_type_indices], marker='|', color='tab:brown', zorder=98)
-    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.chi_cost_terms[active_type_indices], marker='|', color='#333333')
-    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.J_cost_terms[active_type_indices], marker='|', color='tab:purple', zorder=99)
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.xi_cost_terms[active_type_indices] if isinstance(type_set.xi_cost_terms, (list, np.ndarray)) else np.full_like(type_set.energy_costs[active_type_indices], type_set.xi_cost_terms), marker='|', color='tab:brown', zorder=98)
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.chi_cost_terms[active_type_indices] if isinstance(type_set.chi_cost_terms, (list, np.ndarray)) else np.full_like(type_set.energy_costs[active_type_indices], type_set.chi_cost_terms), marker='|', color='#333333')
+    ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=type_set.J_cost_terms[active_type_indices] if isinstance(type_set.J_cost_terms, (list, np.ndarray)) else np.full_like(type_set.energy_costs[active_type_indices], type_set.J_cost_terms), marker='|', color='tab:purple', zorder=99)
     # ax_costs.scatter(y=0.5+np.array(range(len(type_weights[active_type_indices]))), x=strainpool_system.get_fitness(t=0)[active_type_indices], marker='s', zorder=1, color='None', edgecolor='tab:green')
     ax_costs.set_xlim(xmin=0, xmax=max(np.max(type_set.energy_costs), np.max(strainpool_system.get_fitness(t=0))))
     ax_costs.tick_params(axis='y', left=True, labelleft=False)
@@ -244,9 +249,14 @@ def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cu
     
     return fig, [ax_pheno, ax_histx, ax_histy, ax_costs]
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-
+def interp_series_plot(interp, t_vals, ax=None):
+    L = interp(0).shape[0]
+    ax = plt.axes() if ax is None else ax
+    for i in range(L):
+        ax.plot(t_vals, interp(t_vals)[i, :]) 
+    ax.set_ylim(ymin=min(0, np.min(interp(t_vals))))
 
 
 

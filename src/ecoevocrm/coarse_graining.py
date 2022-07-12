@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 
 import ecoevocrm.utils as utils
 
@@ -64,7 +65,7 @@ def get_functional_group_abundances(system, trait_subset, t=None, t_index=None, 
 
 def turnover_metric(abundances_t0, abundances_tf, inverse=False):
     # Based on: https://besjournals.onlinelibrary.wiley.com/doi/full/10.1111/1365-2664.12959
-    turnover = np.sum(np.power((abundances_t0 - abundances_tf), 2)) / ( np.sum(np.power(abundances_t0, 2)) + np.sum(np.power(abundances_t0, 2)) - np.sum(abundances_t0 * abundances_tf) )
+    turnover = np.sum(np.power((abundances_t0 - abundances_tf), 2)) / ( np.sum(np.power(abundances_t0, 2)) + np.sum(np.power(abundances_tf, 2)) - np.sum(abundances_t0 * abundances_tf) )
     # if(turnover > 1 or turnover < 0):
         # print('abundances_t0\n', abundances_t0)
         # print('abundances_tf\n', abundances_tf)
@@ -87,8 +88,8 @@ def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False):
     for i, clade_id in enumerate(clade_abds_tf_dict.keys()):
         if(clade_id not in clade_abds_t0_dict):
             clade_abds_t0_dict[clade_id] = 0
-    print('clade_abds_t0_dict', clade_abds_t0_dict)
-    print('clade_abds_tf_dict', clade_abds_tf_dict)
+    # print('clade_abds_t0_dict', clade_abds_t0_dict)
+    # print('clade_abds_tf_dict', clade_abds_tf_dict)
     #----------------------------------
     clade_abds_t0    = np.array([clade_abds_t0_dict[clade_id] for clade_id in sorted(clade_abds_t0_dict.keys())])
     clade_abds_tf    = np.array([clade_abds_tf_dict[clade_id] for clade_id in sorted(clade_abds_tf_dict.keys())])
@@ -128,7 +129,48 @@ def functional_group_turnover(system, trait_subset, t0, tf, inverse=False):
         # print(group_abds_tf_dict)
         # print(group_abds_tf)
     return tm
-    
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# def functional_group_diversity(system, trait_subset, t=None, t_index=None, metric='shannon'):
+#     t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
+#     #----------------------------------
+#     if(metric == 'shannon'):
+#         abundances = get_functional_group_abundances(system, trait_subset, t_index=t_idx, relative_abundance=True)
+#         print("abundances", abundances)
+#     #----------------------------------
+#     else:
+#         utils.error(f"Error in functional_group_diversity(): diversity metric '{metric}' is not recognized.")
+
+def phylogenetic_group_diversity(system, phylogeny_depth, t=None, t_index=None, metric='shannon'):
+    t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
+    #----------------------------------
+    if(metric == 'shannon'):
+        abundances = list( get_phylogenetic_group_abundances(system, phylogeny_depth, t_index=t_idx, relative_abundance=True).values() )
+        abundances = abundances/np.sum(abundances)
+        entropy = scipy.stats.entropy(abundances)
+        diversity = entropy
+    #----------------------------------
+    else:
+        utils.error(f"Error in phylogenetic_group_diversity(): diversity metric '{metric}' is not recognized.")
+    #----------------------------------
+    return diversity
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def functional_group_diversity(system, trait_subset, t=None, t_index=None, metric='shannon'):
+    t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
+    #----------------------------------
+    if(metric == 'shannon'):
+        abundances = list( get_functional_group_abundances(system, trait_subset, t_index=t_idx, relative_abundance=True).values() )
+        abundances = abundances/np.sum(abundances)
+        entropy = scipy.stats.entropy(abundances)
+        diversity = entropy
+    #----------------------------------
+    else:
+        utils.error(f"Error in functional_group_diversity(): diversity metric '{metric}' is not recognized.")
+    #----------------------------------
+    return diversity
     
             
     
