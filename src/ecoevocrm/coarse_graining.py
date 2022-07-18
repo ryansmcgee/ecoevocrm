@@ -22,20 +22,32 @@ def get_Lstar_types(system, Lstar='all', nonzero_abundance_only=True):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=None, relative_abundance=False):
+def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=None, relative_abundance=False, mode='branchings'):
     t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
     #----------------------------------
-    lineageIDs          = np.array(system.type_set.lineage_ids)
-    extant_type_indices = system.get_extant_type_indices(t_index=t_idx)
-    type_lineageIDs     = lineageIDs[extant_type_indices]
-    type_cladeIDs       = np.array(['.'.join(lid.split('.')[:phylogeny_depth]) for lid in type_lineageIDs])# if lid.count('.') >= phylogeny_depth-1]
-    unique_cladeIDs     = np.unique(type_cladeIDs)
+    if(mode == 'branchings'):
+        lineageIDs          = np.array(system.type_set.lineage_ids)
+        extant_type_indices = system.get_extant_type_indices(t_index=t_idx)
+        type_lineageIDs     = lineageIDs[extant_type_indices]
+        type_cladeIDs       = np.array(['.'.join(lid.split('.')[:phylogeny_depth]) for lid in type_lineageIDs])# if lid.count('.') >= phylogeny_depth-1]
+        unique_cladeIDs     = np.unique(type_cladeIDs)
+        #----------------------------------
+        clade_abds_dict = {}
+        for i, clade_id in enumerate(unique_cladeIDs):
+            clade_abds_dict[clade_id] = np.sum( system.get_type_abundance(t_index=t_idx)[extant_type_indices[np.where(type_cladeIDs == clade_id)[0]]] )
+            if(relative_abundance):
+                clade_abds_dict[clade_id] /= np.sum(system.get_type_abundance(t_index=t_idx))
     #----------------------------------
-    clade_abds_dict = {}
-    for i, clade_id in enumerate(unique_cladeIDs):
-        clade_abds_dict[clade_id] = np.sum( system.get_type_abundance(t_index=t_idx)[extant_type_indices[np.where(type_cladeIDs == clade_id)[0]]] )
-        if(relative_abundance):
-            clade_abds_dict[clade_id] /= np.sum(system.get_type_abundance(t_index=t_idx))
+    if(mode == 'coalescings'):
+        lineageIDs          = np.array(system.type_set.lineage_ids)
+        extant_type_indices = system.get_extant_type_indices(t_index=t_idx)
+        type_lineageIDs     = lineageIDs[extant_type_indices]
+
+        phylogeny_tree = system.type_set.phylogeny
+        print(phy)
+
+
+
     #----------------------------------
     return clade_abds_dict
 

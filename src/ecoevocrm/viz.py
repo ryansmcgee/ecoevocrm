@@ -174,7 +174,7 @@ def Lstar_types_plot(system, ax=None, figsize=(7,5)):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cutoff=None, figsize=(10, 10)):
+def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cutoff=None, figsize=(10, 10), type_colors=None):
     
     type_set = strainpool_system.type_set
     
@@ -217,7 +217,7 @@ def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cu
     ax_pheno.set_yticks(0.5+np.array(range(len(active_type_indices))))
     ax_pheno.set_yticklabels(active_type_indices, rotation=0)
     
-    ax_histy.barh(range(len(type_weights[active_type_indices])), type_weights[active_type_indices], 1, align='edge', edgecolor='white', alpha=0.5)
+    ax_histy.barh(range(len(type_weights[active_type_indices])), type_weights[active_type_indices], 1, align='edge', edgecolor='white', alpha=0.5, color=type_colors[active_type_indices])
     ax_histy.tick_params(axis='y', left=True, labelleft=False)
     ax_histy.spines['top'].set_visible(False)
     ax_histy.spines['right'].set_visible(False)

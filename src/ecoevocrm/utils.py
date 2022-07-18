@@ -90,6 +90,20 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
             if(i >= j):
                 continue
             M[i,j] = np.random.normal( loc=0, scale=J_0*(1/(1 + np.exp((max(i,j) - n_star)/delta))) )
+    elif(mode == 'tikhonov_sigmoid_nonrandom'):
+        J_0    = args['J_0'] if 'J_0' in args else 0.4
+        n_star = args['n_star'] if 'n_star' in args else 10
+        delta  = args['delta'] if 'delta' in args else 5
+        M = np.zeros(shape=shape)
+        vals   = [J_0/(1 + np.exp((i - n_star)/delta)) for i in range(int((M.shape[0]*M.shape[0]-M.shape[0])/2))]
+        c = 0
+        for j in range(M.shape[1]):
+            for i in range(M.shape[0]):
+                if(j <= i):
+                    continue
+                else:
+                    M[i,j] = vals[c] * (1 if (j+i)%2==0 else -1)
+                    c += 1
     elif(mode == 'choice'):
         M = np.random.choice(a=args['a'], size=shape)
     else:
