@@ -143,9 +143,9 @@ def turnover_metric(abundances_t0, abundances_tf, inverse=False):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False):
-    clade_abds_t0_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=t0, relative_abundance=True)
-    clade_abds_tf_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=tf, relative_abundance=True)
+def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False, mode='branchings'):
+    clade_abds_t0_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=t0, relative_abundance=True, mode='branchings')
+    clade_abds_tf_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=tf, relative_abundance=True, mode='branchings')
     for i, clade_id in enumerate(clade_abds_t0_dict.keys()):
         if(clade_id not in clade_abds_tf_dict):
             clade_abds_tf_dict[clade_id] = 0
@@ -206,11 +206,11 @@ def functional_group_turnover(system, trait_subset, t0, tf, inverse=False):
 #     else:
 #         utils.error(f"Error in functional_group_diversity(): diversity metric '{metric}' is not recognized.")
 
-def phylogenetic_group_diversity(system, phylogeny_depth, t=None, t_index=None, metric='shannon'):
+def phylogenetic_group_diversity(system, phylogeny_depth, t=None, t_index=None, metric='shannon', mode='branchings'):
     t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
     #----------------------------------
     if(metric == 'shannon'):
-        abundances = list( get_phylogenetic_group_abundances(system, phylogeny_depth, t_index=t_idx, relative_abundance=True).values() )
+        abundances = list( get_phylogenetic_group_abundances(system, phylogeny_depth, t_index=t_idx, relative_abundance=True).values(), mode='branchings' )
         abundances = abundances/np.sum(abundances)
         entropy = scipy.stats.entropy(abundances)
         diversity = entropy
