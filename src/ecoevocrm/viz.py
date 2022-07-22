@@ -120,6 +120,68 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineage_ids=True, show_phenotypes=True,
+                   type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
+                   color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
+    
+    if(type_colors is None):
+        type_colors = viz.color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min)
+    
+    ax = plt.axes() if ax is None else ax
+    
+    for i in range(system.num_types)[::-1]:
+        
+        try:
+            
+            abd_series = system.N_series[i, :]
+        
+            tidx_birth = (abd_series != 0).argmax(axis=0)
+            t_birth    = system.t_series[tidx_birth]
+
+            tidx_death = np.nonzero(abd_series)[0][-1]
+            t_death    = system.t_series[tidx_death]
+
+            parent_idx = system.type_set.parent_indices[i]
+
+            N_total_end = np.sum(system.N_series[:, -1])
+            N_i_end     = system.N_series[i, -1]
+            
+            ypos_i      = system.type_set.energy_costs[i] if y_axis == 'cost' else -i
+            ypos_parent = system.type_set.energy_costs[parent_idx] if y_axis == 'cost' else -parent_idx
+            
+            ax.plot([t_birth, t_death], [ypos_i, ypos_i], color=type_colors[i], lw=0.5) 
+
+            if(parent_idx is not None):
+                ax.plot([t_birth, t_birth], [ypos_parent, ypos_i], color=type_colors[parent_idx], ls='--', lw=0.5, zorder=-99)
+
+            if(N_i_end > 0):
+                ax.plot([t_death, t_death+t_death*0.2], [ypos_i, ypos_i], color='#999999', ls=':', lw=0.5)
+                ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90)
+                
+                if(show_lineage_ids):
+                    ax.annotate(system.type_set.lineage_ids[i] 
+                                    + ('  ' + ''.join(['X' if system.type_set.sigma[i][j] == 1 else '-' for j in range(system.type_set.num_traits)]) if show_phenotypes else '')
+                                    + ('  ' + "{0:.6f}".format(system.type_set.xi.ravel()[i] )), 
+                                xy=(t_death+t_death*0.35, ypos_i), color=type_colors[i], fontsize=2, xycoords='data', annotation_clip=False)
+                
+        except:
+            pass
+
+    if(log_x_axis):
+        ax.set_xscale('log')
+        
+    ax.set_xlabel("time")
+    ax.set_yticks([])
+
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    plt.tight_layout()
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def resource_plot(system, ax=None, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False, stacked=False, relative=False, resource_colors=None, palette='hls', linewidth=None, edgecolor=None, legend=True):
 
     if(t_max is None):
@@ -341,7 +403,7 @@ def tree_plot(system, ax=None, t_max=None, log_x_axis=False, log_y_axis=False, o
         ax.set_yscale('log')
 
     return ax
->>>>>>> main
+
 
 
 
