@@ -322,9 +322,12 @@ class ConsumerResourceSystem():
             #------------------------------
             if(sol.status == 1): # An event occurred
                 if(len(sol.t_events[0]) > 0):
-                    print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="") # ")#
-                    self.handle_mutation_event()
-                    self.handle_type_loss()
+                    if(np.sum(self.mutation_propensities) > 0):
+                        print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="") # ")#
+                        # print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]") # ")#
+                        self.handle_mutation_event()
+                        # print(f"[ handle type loss after mutation  t={self.t:.4f} {typeCountStr}]\t\r", end="") # ")#
+                        self.handle_type_loss()
                 if(len(sol.t_events) > 1 and len(sol.t_events[1]) > 0):
                     print(f"[ Low abundance event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="") # ")#
                     self.handle_type_loss()
@@ -381,8 +384,12 @@ class ConsumerResourceSystem():
         self.mutant_fitnesses = growth_rate[-num_mutants:]
 
         self.mutation_propensities = np.maximum(0, self.mutant_fitnesses * np.repeat(N_t[:num_types] * mu, repeats=num_resources))
+
+        # print("(dyn) self.mutation_propensities", self.mutation_propensities)
                                                           
         dCumPropMut = np.sum(self.mutation_propensities, keepdims=True)
+
+        # print("(dyn) dCumPropMut", dCumPropMut)
         
         #------------------------------
 
@@ -472,6 +479,13 @@ class ConsumerResourceSystem():
 
     def event_mutation(self, t, variables, *args):
         cumulative_mutation_propensity = variables[-1]
+        # print("(event) -----")
+        # try:
+        #     print("(event) sum self.mutation_propensities", np.sum(self.mutation_propensities))
+        # except: 
+        #     pass
+        # print("(event) cumulative_mutation_propensity", cumulative_mutation_propensity)
+        # print("(event) thresh diff", self.threshold_mutation_propensity - cumulative_mutation_propensity)
         return self.threshold_mutation_propensity - cumulative_mutation_propensity
     #----------------------------------
     event_mutation.direction = -1
@@ -486,7 +500,8 @@ class ConsumerResourceSystem():
         #------------------------------
         abundances_abs = N_t[N_t > 0]
         abundances_rel = abundances_abs/np.sum(abundances_abs)
-        return -1 if np.any(abundances_abs < self.threshold_min_abs_abundance) or np.any(abundances_rel < self.threshold_min_rel_abundance) else 1
+        # return -1 if np.any(abundances_abs < self.threshold_min_abs_abundance) or np.any(abundances_rel < self.threshold_min_rel_abundance) else 1
+        return -1 if np.any(abundances_abs < self.threshold_min_abs_abundance) else 1
     #------------------------------
     event_low_abundance.direction = -1
     event_low_abundance.terminal  = True
@@ -497,9 +512,13 @@ class ConsumerResourceSystem():
     def handle_mutation_event(self):
         # print(">>>>>>>>>>>>>>>>")
         # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
+        # try:
         mutant_indices   = self.type_set.get_mutant_indices(self._active_type_indices)
         mutant_drawprobs = self.mutation_propensities/np.sum(self.mutation_propensities)
         mutant_idx       = np.random.choice(mutant_indices, p=mutant_drawprobs)
+        # except:
+        #     print("self.mutation_propensities", self.mutation_propensities)
+        #     print("mutant_drawprobs", mutant_drawprobs)
         # Retrieve the mutant and some of its properties:
         mutant           = self.mutant_set.get_type(mutant_idx)
         # print("mutant.xi", mutant.xi)
