@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+import copy
 
 import ecoevocrm.utils as utils
 
@@ -25,13 +26,15 @@ def get_Lstar_types(system, Lstar='all', nonzero_abundance_only=True):
 def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=None, relative_abundance=False, mode='branchings'):
     t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
     #----------------------------------
+    lineageIDs             = np.array(system.type_set.lineage_ids)
+    extant_type_indices    = system.get_extant_type_indices(t_index=t_idx)
+    extant_type_lineageIDs = lineageIDs[extant_type_indices]
+    extant_type_abundances = system.get_type_abundance(type_index=extant_type_indices, t_index=t_idx)
+    #----------------------------------
     if(mode == 'branchings'):
-        lineageIDs          = np.array(system.type_set.lineage_ids)
-        extant_type_indices = system.get_extant_type_indices(t_index=t_idx)
-        type_lineageIDs     = lineageIDs[extant_type_indices]
-        type_cladeIDs       = np.array(['.'.join(lid.split('.')[:phylogeny_depth]) for lid in type_lineageIDs])# if lid.count('.') >= phylogeny_depth-1]
-        unique_cladeIDs     = np.unique(type_cladeIDs)
-        #----------------------------------
+        type_cladeIDs          = np.array(['.'.join(lid.split('.')[:phylogeny_depth]) for lid in extant_type_lineageIDs])# if lid.count('.') >= phylogeny_depth-1]
+        unique_cladeIDs        = np.unique(type_cladeIDs)
+        #------------------------------
         clade_abds_dict = {}
         for i, clade_id in enumerate(unique_cladeIDs):
             clade_abds_dict[clade_id] = np.sum( system.get_type_abundance(t_index=t_idx)[extant_type_indices[np.where(type_cladeIDs == clade_id)[0]]] )
@@ -39,15 +42,64 @@ def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=N
                 clade_abds_dict[clade_id] /= np.sum(system.get_type_abundance(t_index=t_idx))
     #----------------------------------
     if(mode == 'coalescings'):
-        lineageIDs          = np.array(system.type_set.lineage_ids)
-        extant_type_indices = system.get_extant_type_indices(t_index=t_idx)
-        type_lineageIDs     = lineageIDs[extant_type_indices]
-
-        phylogeny_tree = system.type_set.phylogeny
-        print(phy)
-
-
-
+        _tree = copy.deepcopy(system.type_set.phylogeny)
+        #------------------------------
+        def collapse_subtrees(tree_dict):
+            for child_id, childs_subtree in tree_dict.items():
+                if(len(childs_subtree) == 0):
+                    continue
+                else:
+                    all_children_have_empty_subtrees = True
+                    for grandchild_id, grandchilds_subtree in childs_subtree.items():
+                        if(len(grandchilds_subtree) > 0):
+                            all_children_have_empty_subtrees = False
+                            break
+                    if(all_children_have_empty_subtrees):
+                        # collapse this child's subtree:
+                        # print(f">> collapsing {child_id}")
+                        tree_dict[child_id] = {}
+                    else:
+                        # traverse down into the child's subtree:
+                        collapse_subtrees(childs_subtree)
+        #..............................
+        # Repeated rounds of childless subtree collapses   
+        for d in range(1, phylogeny_depth+1):
+            collapse_subtrees(_tree)
+        #------------------------------    
+        def collect_abundances(tree_dict, abds_dict):
+            for child_id, childs_subtree in tree_dict.items():
+                # print(child_id, "::", len(childs_subtree), "children,", ("extant" if child_id in extant_type_lineageIDs else "extinct"), ("interior node" if len(childs_subtree) > 0 else "leaf node"))
+                if(len(childs_subtree) > 0):
+                    # child_id is an interior node in the collapsed tree;
+                    # abundance for this 'clade' is abundance of the type exactly matching this id
+                    for i, extant_id in enumerate(extant_type_lineageIDs):
+                        # check if extant_id mathces the child_id
+                        if (child_id == extant_id):
+                            if(extant_type_abundances[i] > 0):
+                                abds_dict[child_id] = extant_type_abundances[i] / (np.sum(extant_type_abundances) if relative_abundance else 1)
+                            # print ('\t', extant_id, "matches", child_id, "\tabd =", extant_type_abundances[i])
+                            # break
+                        # else:
+                        #     print('\tskip', extant_id)
+                    # continue traversing down the subtrees:
+                    collect_abundances(childs_subtree, abds_dict)
+                else:
+                    # child_id is a leaf in the collapsed tree; 
+                    # abundance for this clade is sum of all extant types that begin with this child_id
+                    clade_abd = 0.0
+                    for i, extant_id in enumerate(extant_type_lineageIDs):
+                        # check if extant_id starts with the child_id
+                        if (child_id == extant_id or extant_id[:len(child_id)+1] == child_id+'.'):
+                        # if (child_id in extant_id and re.search("^" + child_id, extant_id)):
+                            clade_abd += extant_type_abundances[i]
+                            # print ('\t', extant_id, "starts with", child_id, "\tabd =", extant_type_abundances[i])
+                        # else:
+                        #     print('\tskip', extant_id)
+                    if(clade_abd > 0):
+                        abds_dict[child_id] = clade_abd / (np.sum(extant_type_abundances) if relative_abundance else 1)
+        #..............................
+        clade_abds_dict = {}
+        collect_abundances(_tree, clade_abds_dict)
     #----------------------------------
     return clade_abds_dict
 
