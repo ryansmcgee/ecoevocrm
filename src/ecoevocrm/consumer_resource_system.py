@@ -495,17 +495,19 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def handle_mutation_event(self):
+        # print(">>>>>>>>>>>>>>>>")
         # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
         mutant_indices   = self.type_set.get_mutant_indices(self._active_type_indices)
         mutant_drawprobs = self.mutation_propensities/np.sum(self.mutation_propensities)
         mutant_idx       = np.random.choice(mutant_indices, p=mutant_drawprobs)
         # Retrieve the mutant and some of its properties:
         mutant           = self.mutant_set.get_type(mutant_idx)
-        # print()
+        # print("mutant.xi", mutant.xi)
         # print(mutant.sigma)
         mutant_type_id   = self.mutant_set.get_type_id(mutant_idx)
         mutant_fitness   = self.mutant_fitnesses[np.argmax(mutant_indices == mutant_idx)]
         mutant_abundance = np.maximum(1/mutant_fitness, 1) # forcing abundance of new types to be at least 1, this is a Ryan addition (perhaps controversial)
+        #----------------------------------
         # Get the index of the parent of the selected mutant:
         parent_idx       = mutant_idx // self.type_set.num_traits
         #----------------------------------
@@ -524,6 +526,10 @@ class ConsumerResourceSystem():
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx)-mutant_abundance, 1))
         #----------------------------------
+        # print("community xi")
+        # print(self.type_set.xi)
+        # print("mutant_set xi")
+        # print(self.mutant_set.xi)
         return
     
 
@@ -554,6 +560,18 @@ class ConsumerResourceSystem():
         self.set_type_abundance(type_index=list(range(self.type_set.num_types-new_type_set.num_types, self.type_set.num_types)), abundance=abundance)
         #----------------------------------
         self.mutant_set.add_type(new_type_set.generate_mutant_set())
+
+        # this is VERY hacky:
+        # > a overwrite_type() or update_parameter(type_indices) or similar function should be added to TypeSet that can be used to replace parents mutants (in self.mutant_set) with a newly generated mutant set (with newly drawn xi)
+        if(self.type_set._mean_xi_mut > 0):
+            # print("hhhhhhhhhhh")
+            # print(f"parent_index {parent_index}")
+            mutant_indices = self.type_set.get_mutant_indices(parent_index)
+            # print("mutant_indices", mutant_indices)
+            # print("self.mutant_set.xi", self.mutant_set.xi[mutant_indices, :])
+            self.mutant_set.xi[mutant_indices, :] = (self.type_set.xi[parent_index][0] - np.random.exponential(scale=self.type_set._mean_xi_mut, size=self.type_set.num_traits)).reshape((self.type_set.num_traits, 1))
+            # print("*", self.mutant_set.xi[mutant_indices, :])
+            # print("^h^h^h^h^h^")
 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -644,6 +662,9 @@ class ConsumerResourceSystem():
 
     def get_extant_type_indices(self, t=None, t_index=None):
         t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
+        print("XXXXXXXXXXXXXX")
+        print("t", t_idx, self.t_series[t_idx])
+        print((self.N_series[:, t_idx] > 0))
         #----------------------------------
         return np.where(self.N_series[:, t_idx] > 0)[0]
 

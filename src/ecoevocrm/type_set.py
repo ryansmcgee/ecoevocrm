@@ -19,6 +19,7 @@ class TypeSet():
                        chi         = None,
                        J           = None,
                        mu          = 1e-10, 
+                       mean_xi_mut = 0,
                        lineage_ids = None,
                        normalize_phenotypes = False,
                        binarize_traits_chi_cost_terms = False,
@@ -63,10 +64,13 @@ class TypeSet():
         self._eta    = self.preprocess_params(eta,   has_trait_dim=True)
         self._lamda  = self.preprocess_params(lamda, has_trait_dim=True)
         self._gamma  = self.preprocess_params(gamma, has_trait_dim=False)
-        self._xi     = self.preprocess_params(xi,    has_trait_dim=False)
+        self._xi     = self.preprocess_params(xi,    has_trait_dim=False, force_expandable_array=(mean_xi_mut > 0))
         self._mu     = self.preprocess_params(mu,    has_trait_dim=False)
         self._chi    = self.preprocess_params(chi, has_trait_dim=True) if chi is not None else None
         self._J      = utils.reshape(J, shape=(self.num_traits, self.num_traits)) if J is not None else None
+
+        self._mean_xi_mut = mean_xi_mut
+        # self.__mean_xi_mut = self.preprocess_params(__mean_xi_mut, has_trait_dim=False)
 
         #----------------------------------
         # Initialize other type properties/metadata:
@@ -166,6 +170,14 @@ class TypeSet():
     def mu(self, vals):
         self._mu = self.preprocess_params(vals, has_trait_dim=False)
 
+    # @property
+    # def _mean_xi_mut(self):
+    #     return self.__mean_xi_mut
+
+    # @_mean_xi_mut.setter
+    # def _mean_xi_mut(self, vals):
+    #     self.__mean_xi_mut = self.preprocess_params(vals, has_trait_dim=False)
+
     @property
     def J(self):
         return TypeSet.get_array(self._J)
@@ -227,7 +239,7 @@ class TypeSet():
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def preprocess_params(self, vals, has_trait_dim, dtype='float64'):
+    def preprocess_params(self, vals, has_trait_dim, force_expandable_array=False, dtype='float64'):
         arr = np.array(vals, dtype=dtype) if(isinstance(vals, (list, np.ndarray))) else np.array([vals], dtype=dtype)
         #----------------------------------
         if(has_trait_dim):
@@ -247,10 +259,10 @@ class TypeSet():
         #----------------------------------
         else:
             if(arr.ndim == 1):
-                if(len(arr) == 1):
+                if(len(arr) == 1 and not force_expandable_array):
                     return arr[0] # single val as scalar
                 elif(len(arr) == self.num_types):
-                    if(np.all(arr == arr[0])): # all elements equal
+                    if(np.all(arr == arr[0]) and not force_expandable_array): # all elements equal
                         return arr[0] # single val as scalar
                     else:
                         return utils.ExpandableArray( arr.reshape(self.num_types, 1) )
@@ -292,21 +304,37 @@ class TypeSet():
         eta_mut   = np.repeat(self.eta,   repeats=self.sigma.shape[1], axis=0) if self.eta.ndim == 2   else self.eta
         lamda_mut = np.repeat(self.lamda, repeats=self.sigma.shape[1], axis=0) if self.lamda.ndim == 2 else self.lamda
         gamma_mut = np.repeat(self.gamma, repeats=self.sigma.shape[1], axis=0) if self.gamma.ndim == 2 else self.gamma
-        xi_mut    = np.repeat(self.xi,    repeats=self.sigma.shape[1], axis=0) if self.xi.ndim == 2    else self.xi
+        # xi_mut    = np.repeat(self.xi,    repeats=self.sigma.shape[1], axis=0) if self.xi.ndim == 2    else self.xi
         chi_mut   = np.repeat(self.chi,   repeats=self.sigma.shape[1], axis=0) if self.chi.ndim == 2   else self.chi
         mu_mut    = np.repeat(self.mu,    repeats=self.sigma.shape[1], axis=0) if self.mu.ndim == 2    else self.mu
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, gamma=gamma_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut)
+        # print(np.max(self.xi - np.random.exponential(scale=self._mean_xi_mut), 0))
+        # print("~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        # print(self.sigma)
+        # print(self.xi)
+        # print("-----")
+        # print("sigma_mut", sigma_mut)
+        if(self._mean_xi_mut > 0):
+            # print("heh")
+            xi_mut = self.xi.ravel() - np.random.exponential(scale=self._mean_xi_mut, size=sigma_mut.shape[0])
+        else:
+            # print("meh")
+            xi_mut = np.repeat(self.xi, repeats=self.sigma.shape[1], axis=0) if self.xi.ndim == 2 else self.xi
+        # print("xi_mut", xi_mut)
+        #----------------------------------
+        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, gamma=gamma_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, mean_xi_mut=self._mean_xi_mut)
+        # print("mutant_set.xi", mutant_set.xi)
         #----------------------------------
         return mutant_set
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, type_set=None, sigma=None, beta=None, kappa=None, eta=None, lamda=None, gamma=None, xi=None, chi=None, mu=None, parent_index=None, parent_id=None, ref_type_idx=None): # index=None, 
+    def add_type(self, type_set=None, sigma=None, beta=None, kappa=None, eta=None, lamda=None, gamma=None, xi=None, chi=None, mu=None, mean_xi_mut=None, parent_index=None, parent_id=None, ref_type_idx=None): # index=None, 
         parent_idx   = np.where(self.type_ids==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
+        # print("add_type xi", xi)
         if(type_set is not None):
             if(isinstance(type_set, TypeSet)):
                 new_type_set = type_set
@@ -320,9 +348,11 @@ class TypeSet():
                                          lamda=lamda if lamda is not None else self.lamda[ref_type_idx],  
                                          gamma=gamma if gamma is not None else self.gamma[ref_type_idx],  
                                          xi=xi if xi is not None else self.xi[ref_type_idx],  
-                                         chi=chi if chi is not None else self.chi[ref_type_idx],  
-                                         mu=mu if mu is not None else self.mu[ref_type_idx]
+                                         chi=chi if chi is not None else self.chi[ref_type_idx], 
+                                         mu=mu if mu is not None else self.mu[ref_type_idx],
+                                         mean_xi_mut=mean_xi_mut if mean_xi_mut is not None else self._mean_xi_mut
                                          )
+        # print("new_type_set.xi", new_type_set.xi)
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != new_type_set.num_traits): 
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({new_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
@@ -336,6 +366,7 @@ class TypeSet():
         self._xi    = self._xi.add(new_type_set.xi)       if isinstance(self._xi,    utils.ExpandableArray) else self._xi
         self._chi   = self._chi.add(new_type_set.chi)     if isinstance(self._chi,   utils.ExpandableArray) else self._chi
         self._mu    = self._mu.add(new_type_set.mu)       if isinstance(self._mu,    utils.ExpandableArray) else self._mu
+        # print("@", self._xi)
         #----------------------------------
         self._parent_indices.append(parent_index) # TODO: this does not work with lists of parent indexes
         #----------------------------------
@@ -396,7 +427,8 @@ class TypeSet():
                         xi    = self.xi[type_idx]    if self.xi.ndim == 2     else self.xi, 
                         chi   = self.chi[type_idx]   if self.chi.ndim == 2    else self.chi, 
                         mu    = self.mu[type_idx]    if self.mu.ndim == 2     else self.mu,
-                        J     = self.J ) 
+                        J     = self.J,
+                        mean_xi_mut = self._mean_xi_mut ) 
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
