@@ -311,9 +311,10 @@ def brownian_series(T, dt=1, lamda=1, eta_mean=0, eta_std=1, k=0, y0=0, v0=0, L=
 
 def get_boltzmann_temp_for_entropy(energy, target_entropy):
     def entropy_diff(beta, energy, target_entropy):
-        boltzmann_dist = np.exp(-beta * energy.astype(np.float128))
-        boltzmann_dist = boltzmann_dist.astype(np.float64)
-        boltzmann_dist /= boltzmann_dist.astype(np.float128).sum()
+        # boltzmann_dist = np.exp(-beta * energy.astype(np.float128))
+        # boltzmann_dist = boltzmann_dist.astype(np.float64)
+        # boltzmann_dist /= boltzmann_dist.astype(np.float128).sum()
+        boltzmann_dist = ( np.exp(-beta * energy.astype(np.float128)) / np.sum(np.exp(-beta * energy.astype(np.float128))) ).astype(np.float64)
         boltzmann_entropy = scipy.stats.entropy(boltzmann_dist)
         return np.abs(boltzmann_entropy - target_entropy)
     res = scipy.optimize.minimize(entropy_diff, x0=1, args=(energy, target_entropy), method='Nelder-Mead')
