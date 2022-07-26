@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import scipy
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -69,7 +70,9 @@ class ExpandableArray():
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangular=False, diagonal=None):
+def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangular=False, diagonal=None, ordered=False, scale_range=None, seed=None):
+    if(seed is not None):
+        np.random.seed(seed)
     #--------------------------------
     # Generate random values according to one of the following random models:
     #--------------------------------
@@ -81,6 +84,17 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
         M = np.random.uniform(low=(args['min'] if 'min' in args else 0), high=(args['max'] if 'max' in args else 1), size=shape )
     elif(mode == 'normal'):
         M = np.random.normal(loc=(args['mean'] if 'mean' in args else 0), scale=(args['std'] if 'std' in args else 1), size=shape )
+    elif(mode == 'logistic'):
+        M = np.random.logistic(loc=(args['mean'] if 'mean' in args else 0), scale=(args['scale'] if 'scale' in args else 1), size=shape )
+    elif(mode == 'exponential'):
+        M = np.random.exponential(scale=(args['scale'] if 'scale' in args else 1), size=shape )
+        M *=  np.random.choice([1, -1], size=shape)
+    elif(mode == 'gamma'):
+        mean     = (args['mean'] if 'mean' in args else 0)
+        coeffvar = (args['coeffvar'] if 'coeffvar' in args else args['cv'] if 'cv' in args else 0)
+        scale    = mean * coeffvar ** 2
+        shape    = mean / scale
+        np.random.gamma(scale=scale, shape=shape, size=shape)
     elif(mode == 'tikhonov_sigmoid'):
         J_0    = args['J_0'] if 'J_0' in args else 0.2
         n_star = args['n_star'] if 'n_star' in args else 10
@@ -90,12 +104,12 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
             if(i >= j):
                 continue
             M[i,j] = np.random.normal( loc=0, scale=J_0*(1/(1 + np.exp((max(i,j) - n_star)/delta))) )
-    elif(mode == 'tikhonov_sigmoid_nonrandom'):
+    elif(mode == 'tikhonov_sigmoid_ordered'):
         J_0    = args['J_0'] if 'J_0' in args else 0.4
         n_star = args['n_star'] if 'n_star' in args else 10
         delta  = args['delta'] if 'delta' in args else 5
         M = np.zeros(shape=shape)
-        vals   = [J_0/(1 + np.exp((i - n_star)/delta)) for i in range(int((M.shape[0]*M.shape[0]-M.shape[0])/2))]
+        vals   = [np.random.choice([1, -1]) * J_0/(1 + np.exp((i - n_star)/delta)) for i in range(int((M.shape[0]*M.shape[0]-M.shape[0])/2))]
         c = 0
         for j in range(M.shape[1]):
             for i in range(M.shape[0]):
@@ -136,6 +150,20 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
     # Set diagonal, if applicable:
     if(diagonal is not None):
         np.fill_diagonal(M, diagonal)
+    #--------------------------------
+    # Make ordered, if applicable:
+    if(ordered):
+        vals = sorted(M[M!=0], key=abs, reverse=True)
+        c = 0
+        for j in range(M.shape[1]):
+            for i in range(M.shape[0]):
+                if(M[i,j] != 0):
+                    M[i,j] = vals[c]
+                    c += 1
+    #--------------------------------
+    # Scale values to desired range, if applicable:
+    if(scale_range is not None):
+        M[M != 0] = np.interp(M[M != 0], (M[M != 0].min(), M[M != 0].max()), (scale_range[0], scale_range[1]))
     #--------------------------------
     return M
 
@@ -271,15 +299,41 @@ def brownian_series(T, dt=1, lamda=1, eta_mean=0, eta_std=1, k=0, y0=0, v0=0, L=
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+# def get_boltzmann_temp_for_entropy(energy, target_entropy):
+#     import scipy
+#     def entropy_diff(beta, energy, target_entropy):
+#         boltzmann_dist = np.exp(-beta * energy) / np.sum(np.exp(-beta * energy))
+#         boltzmann_entropy = scipy.stats.entropy(boltzmann_dist)
+#         return np.abs(boltzmann_entropy - target_entropy)
+#     res = scipy.optimize.minimize(entropy_diff, x0=1, args=(energy, target_entropy), method='Nelder-Mead')
+#     beta_fit = res['x'][0]
+#     return beta_fit
+
 def get_boltzmann_temp_for_entropy(energy, target_entropy):
-    import scipy
     def entropy_diff(beta, energy, target_entropy):
-        boltzmann_dist = np.exp(-beta * energy) / np.sum(np.exp(-beta * energy))
+        boltzmann_dist = np.exp(-beta * energy.astype(np.float128))
+        boltzmann_dist = boltzmann_dist.astype(np.float64)
+        boltzmann_dist /= boltzmann_dist.astype(np.float128).sum()
         boltzmann_entropy = scipy.stats.entropy(boltzmann_dist)
         return np.abs(boltzmann_entropy - target_entropy)
     res = scipy.optimize.minimize(entropy_diff, x0=1, args=(energy, target_entropy), method='Nelder-Mead')
     beta_fit = res['x'][0]
     return beta_fit
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def get_stats(vals, prefix=None, include_last=False):
+    _prefix = '' if prefix is None else prefix+'_'
+    stats = {
+                (_prefix+'mean'):     np.nanmean(vals),
+                (_prefix+'median'):   np.nanmedian(vals),
+                (_prefix+'min'):      np.min(vals),
+                (_prefix+'max'):      np.max(vals),
+                (_prefix+'std'):      np.nanstd(vals),
+                # (_prefix+'var'):      np.nanvar(vals)
+            }
+    return stats
 
 
 

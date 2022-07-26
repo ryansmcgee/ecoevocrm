@@ -159,9 +159,14 @@ def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineag
                 ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90)
                 
                 if(show_lineage_ids):
+                    # print(system.type_set.xi)
+                    # print(system.type_set.xi.ravel())
+                    # print(system.type_set.xi.ravel()[i])
+                    # print(len(system.type_set.xi.ravel()) > 1)
                     ax.annotate(system.type_set.lineage_ids[i] 
-                                    + ('  ' + ''.join(['X' if system.type_set.sigma[i][j] == 1 else '-' for j in range(system.type_set.num_traits)]) if show_phenotypes else '')
-                                    + ('  ' + "{0:.6f}".format(system.type_set.xi.ravel()[i] )), 
+                                    + ('  ' + ''.join(['X' if system.type_set.sigma[i][j] > 0 else '-' for j in range(system.type_set.num_traits)]) if show_phenotypes else '')
+                                    + ('  ' + "{0:.6f}".format(system.type_set.xi.ravel()[i] if isinstance(system.type_set.xi, np.ndarray) else system.type_set.xi ))
+                                    , 
                                 xy=(t_death+t_death*0.35, ypos_i), color=type_colors[i], fontsize=2, xycoords='data', annotation_clip=False)
                 
         except:

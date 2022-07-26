@@ -49,7 +49,7 @@ class TypeSet():
 
         self.normalize_phenotypes = normalize_phenotypes
         if(self.normalize_phenotypes):
-            norm_denom = sigma.sum(axis=1, keepdims=1)
+            norm_denom = np.atleast_2d(sigma).sum(axis=1, keepdims=1)
             norm_denom[norm_denom == 0] = 1
             sigma = sigma/norm_denom
 
@@ -308,22 +308,13 @@ class TypeSet():
         chi_mut   = np.repeat(self.chi,   repeats=self.sigma.shape[1], axis=0) if self.chi.ndim == 2   else self.chi
         mu_mut    = np.repeat(self.mu,    repeats=self.sigma.shape[1], axis=0) if self.mu.ndim == 2    else self.mu
         #----------------------------------
-        # print(np.max(self.xi - np.random.exponential(scale=self._mean_xi_mut), 0))
-        # print("~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        # print(self.sigma)
-        # print(self.xi)
-        # print("-----")
-        # print("sigma_mut", sigma_mut)
         if(self._mean_xi_mut > 0):
-            # print("heh")
             xi_mut = self.xi.ravel() - np.random.exponential(scale=self._mean_xi_mut, size=sigma_mut.shape[0])
         else:
-            # print("meh")
             xi_mut = np.repeat(self.xi, repeats=self.sigma.shape[1], axis=0) if self.xi.ndim == 2 else self.xi
-        # print("xi_mut", xi_mut)
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, gamma=gamma_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, mean_xi_mut=self._mean_xi_mut)
-        # print("mutant_set.xi", mutant_set.xi)
+        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, gamma=gamma_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, mean_xi_mut=self._mean_xi_mut,
+                             normalize_phenotypes=self.normalize_phenotypes, binarize_traits_chi_cost_terms=self.binarize_traits_chi_cost_terms, binarize_traits_J_cost_terms=self.binarize_traits_J_cost_terms)
         #----------------------------------
         return mutant_set
 
@@ -334,7 +325,6 @@ class TypeSet():
         parent_idx   = np.where(self.type_ids==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
-        # print("add_type xi", xi)
         if(type_set is not None):
             if(isinstance(type_set, TypeSet)):
                 new_type_set = type_set
@@ -352,7 +342,6 @@ class TypeSet():
                                          mu=mu if mu is not None else self.mu[ref_type_idx],
                                          mean_xi_mut=mean_xi_mut if mean_xi_mut is not None else self._mean_xi_mut
                                          )
-        # print("new_type_set.xi", new_type_set.xi)
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != new_type_set.num_traits): 
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({new_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
@@ -366,7 +355,6 @@ class TypeSet():
         self._xi    = self._xi.add(new_type_set.xi)       if isinstance(self._xi,    utils.ExpandableArray) else self._xi
         self._chi   = self._chi.add(new_type_set.chi)     if isinstance(self._chi,   utils.ExpandableArray) else self._chi
         self._mu    = self._mu.add(new_type_set.mu)       if isinstance(self._mu,    utils.ExpandableArray) else self._mu
-        # print("@", self._xi)
         #----------------------------------
         self._parent_indices.append(parent_index) # TODO: this does not work with lists of parent indexes
         #----------------------------------
@@ -428,7 +416,10 @@ class TypeSet():
                         chi   = self.chi[type_idx]   if self.chi.ndim == 2    else self.chi, 
                         mu    = self.mu[type_idx]    if self.mu.ndim == 2     else self.mu,
                         J     = self.J,
-                        mean_xi_mut = self._mean_xi_mut ) 
+                        mean_xi_mut = self._mean_xi_mut,
+                        normalize_phenotypes           = self.normalize_phenotypes,
+                        binarize_traits_chi_cost_terms = self.binarize_traits_chi_cost_terms,
+                        binarize_traits_J_cost_terms   = self.binarize_traits_J_cost_terms ) 
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -491,6 +482,18 @@ class TypeSet():
         self._parent_indices = [np.where(type_order == pidx)[0][0] if pidx != None else None for pidx in _parent_indices_tempreorder]
         #----------------------------------
         return
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_lineage_depths(self):
+        lineage_depths = [len(lin_id.split('.')) for lin_id in self.lineage_ids]
+        return lineage_depths
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_num_mutations(self):
+        return np.array(self.get_lineage_depths()) - 1
 
 
 

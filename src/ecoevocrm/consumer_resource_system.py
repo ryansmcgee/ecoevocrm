@@ -479,7 +479,7 @@ class ConsumerResourceSystem():
 
     def event_mutation(self, t, variables, *args):
         cumulative_mutation_propensity = variables[-1]
-        # print("(event) -----")
+        # print(f"(event) mmmmm {self.threshold_mutation_propensity - cumulative_mutation_propensity}")#" \t\r", end ="")
         # try:
         #     print("(event) sum self.mutation_propensities", np.sum(self.mutation_propensities))
         # except: 
@@ -495,11 +495,12 @@ class ConsumerResourceSystem():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def event_low_abundance(self, t, variables, *args):
+        # print("(event) lllll \t\r", end ="")
         num_types = args[0]
         N_t = variables[:num_types]
         #------------------------------
         abundances_abs = N_t[N_t > 0]
-        abundances_rel = abundances_abs/np.sum(abundances_abs)
+        # abundances_rel = abundances_abs/np.sum(abundances_abs)
         # return -1 if np.any(abundances_abs < self.threshold_min_abs_abundance) or np.any(abundances_rel < self.threshold_min_rel_abundance) else 1
         return -1 if np.any(abundances_abs < self.threshold_min_abs_abundance) else 1
     #------------------------------
@@ -610,7 +611,7 @@ class ConsumerResourceSystem():
         type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
         time_indices = [ np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
         #----------------------------------
-        abundances = self.N_series[type_indices, time_indices]
+        abundances = self.N_series[type_indices, :][:, time_indices]
         return abundances if len(type_indices) > 1 else abundances[0]
 
     
@@ -681,9 +682,6 @@ class ConsumerResourceSystem():
 
     def get_extant_type_indices(self, t=None, t_index=None):
         t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
-        print("XXXXXXXXXXXXXX")
-        print("t", t_idx, self.t_series[t_idx])
-        print((self.N_series[:, t_idx] > 0))
         #----------------------------------
         return np.where(self.N_series[:, t_idx] > 0)[0]
 
@@ -799,7 +797,115 @@ class ConsumerResourceSystem():
         #----------------------------------
         return self.type_set.get_type(self.type_set.energy_costs[self.type_set.energy_costs <= cost_cutoff].argsort()[:rank_cutoff])
 
-            
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_resource_demand(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None, relative_demand=False):
+        type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+        time_indices = [ np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+        #----------------------------------
+        abundances = self.get_type_abundance(type_index=type_indices, t_index=time_indices)
+        #----------------------------------
+        resource_demand = np.einsum(('ij,jk->ik' if abundances.ndim == 2 else 'i,ij->j'), abundances.T, self.type_set.sigma[type_indices, :][:, trait_subset])
+        if(relative_demand):
+            resource_demand /= resource_demand.sum()
+        #----------------------------------
+        return(resource_demand.T)
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_biomass(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
+        type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+        time_indices = [ np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+        #----------------------------------
+        resource_demand = self.get_resource_demand(type_index=type_indices, t_index=time_indices, trait_subset=trait_subset)
+        #----------------------------------
+        biomass = resource_demand.sum(axis=0)
+        #----------------------------------
+        return(biomass)
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_num_extant_types(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
+        type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+        time_indices = [ np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+        #----------------------------------
+        abundances = self.get_type_abundance(type_index=type_indices, t_index=time_indices)
+        #----------------------------------
+        num_extant_types = np.count_nonzero(abundances, axis=0)
+        #----------------------------------
+        return num_extant_types
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_num_extant_phenotypes(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
+        type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+        time_indices = [ np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+        #----------------------------------
+        numphenos_by_time = []
+        for tidx in time_indices:
+            extant_type_indices = self.get_extant_type_indices(t_index=tidx)
+            extant_type_indices_of_interest = list( set(extant_type_indices).intersection(set(type_indices)) )
+            sigma_subset = self.type_set.sigma[extant_type_indices_of_interest, :][:, trait_subset]
+            num_phenotypes = np.unique(sigma_subset, axis=0).shape[0]
+            numphenos_by_time.append(num_phenotypes)
+        #----------------------------------
+        return np.array(numphenos_by_time)
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_num_traits_per_type(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None, summary_stat=None):
+        type_indices = [ np.where(np.array(self.type_set.type_ids) == tid)[0] for tid in utils.treat_as_list(type_id) ] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+        time_indices = [ np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t) ] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+        #----------------------------------
+        if(isinstance(time_indices, (list, np.ndarray))):
+            numtraits_by_time = []
+            for tidx in time_indices:
+                extant_type_indices = self.get_extant_type_indices(t_index=tidx)
+                extant_type_indices_of_interest = list( set(extant_type_indices).intersection(set(type_indices)) )
+                sigma_subset = self.type_set.sigma[extant_type_indices_of_interest, :][:, trait_subset]
+                num_traits = np.count_nonzero(sigma_subset, axis=1)
+                if(summary_stat == 'mean' or summary_stat == 'average'):
+                    numtraits_by_time.append(np.mean(num_traits))
+                elif(summary_stat == 'median'):
+                    numtraits_by_time.append(np.median(num_traits))
+                elif(summary_stat == 'min'):
+                    numtraits_by_time.append(np.min(num_traits))
+                elif(summary_stat == 'max'):
+                    numtraits_by_time.append(np.max(num_traits))
+                elif(summary_stat == 'std' or summary_stat == 'stdev'):
+                    numtraits_by_time.append(np.std(num_traits))
+                else:
+                    numtraits_by_time.append(num_traits)
+            #----------------------------------
+            return np.array(numtraits_by_time)
+        else:
+            extant_type_indices = self.get_extant_type_indices(t_index=time_indices)
+            extant_type_indices_of_interest = list( set(extant_type_indices).intersection(set(type_indices)) )
+            sigma_subset = self.type_set.sigma[extant_type_indices_of_interest, :][:, trait_subset]
+            num_traits = np.count_nonzero(sigma_subset, axis=1)
+            if(summary_stat == 'mean' or summary_stat == 'average'):
+                return np.mean(num_traits)
+            elif(summary_stat == 'median'):
+                return np.median(num_traits)
+            elif(summary_stat == 'min'):
+                return np.min(num_traits)
+            elif(summary_stat == 'max'):
+                return np.max(num_traits)
+            elif(summary_stat == 'std' or summary_stat == 'stdev'):
+                return np.std(num_traits)
+            else:
+                return num_traits
+        
             
 
 

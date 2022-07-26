@@ -29,7 +29,10 @@ def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=N
     lineageIDs             = np.array(system.type_set.lineage_ids)
     extant_type_indices    = system.get_extant_type_indices(t_index=t_idx)
     extant_type_lineageIDs = lineageIDs[extant_type_indices]
-    extant_type_abundances = system.get_type_abundance(type_index=extant_type_indices, t_index=t_idx)
+    abundances             = system.get_type_abundance(t_index=t_idx).ravel()
+    total_abundance        = np.sum(abundances)
+    # extant_type_abundances = system.get_type_abundance(type_index=extant_type_indices, t_index=t_idx).ravel()
+    extant_type_abundances = abundances[extant_type_indices]
     #----------------------------------
     if(mode == 'branchings'):
         type_cladeIDs          = np.array(['.'.join(lid.split('.')[:phylogeny_depth]) for lid in extant_type_lineageIDs])# if lid.count('.') >= phylogeny_depth-1]
@@ -37,9 +40,9 @@ def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=N
         #------------------------------
         clade_abds_dict = {}
         for i, clade_id in enumerate(unique_cladeIDs):
-            clade_abds_dict[clade_id] = np.sum( system.get_type_abundance(t_index=t_idx)[extant_type_indices[np.where(type_cladeIDs == clade_id)[0]]] )
+            clade_abds_dict[clade_id] = np.sum( abundances[extant_type_indices[np.where(type_cladeIDs == clade_id)[0]]] )
             if(relative_abundance):
-                clade_abds_dict[clade_id] /= np.sum(system.get_type_abundance(t_index=t_idx))
+                clade_abds_dict[clade_id] /= total_abundance
     #----------------------------------
     if(mode == 'coalescings'):
         _tree = copy.deepcopy(system.type_set.phylogeny)
@@ -92,6 +95,9 @@ def get_phylogenetic_group_abundances(system, phylogeny_depth, t=None, t_index=N
                         if (child_id == extant_id or extant_id[:len(child_id)+1] == child_id+'.'):
                         # if (child_id in extant_id and re.search("^" + child_id, extant_id)):
                             clade_abd += extant_type_abundances[i]
+                            # print("extant_type_abundances", extant_type_abundances, extant_type_abundances.shape)
+                            # print("extant_type_abundances[i]", extant_type_abundances[i])
+                            # print("clade_abd", clade_abd)
                             # print ('\t', extant_id, "starts with", child_id, "\tabd =", extant_type_abundances[i])
                         # else:
                         #     print('\tskip', extant_id)
@@ -112,15 +118,21 @@ def get_functional_group_abundances(system, trait_subset, t=None, t_index=None, 
     extant_type_indices = system.get_extant_type_indices(t_index=t_idx)
     functypes           = system.type_set.sigma[extant_type_indices, :][:, trait_subset]
     unique_functypes    = np.unique(functypes, axis=0)
+    abundances          = system.get_type_abundance(t_index=t_idx).ravel()
+    total_abundance     = np.sum(abundances)
     #----------------------------------
     group_abds_dict = {}
-    for i, group_trait_profile in enumerate(unique_functypes):
+    for j, group_trait_profile in enumerate(unique_functypes):
         group_id = np.array(['-' for i in range(system.type_set.num_traits)])
+        # print("?  ", group_id)
         group_id[list(trait_subset)] = [str(int(i != 0)) for i in group_trait_profile]
+        # print("?? ", group_id)
         group_id = ''.join(group_id.tolist())
-        group_abds_dict[group_id] = np.sum( system.get_type_abundance(t_index=t_idx)[extant_type_indices[np.where((functypes == group_trait_profile).all(axis=1))[0]]] )
+        # print("???", group_id)
+        group_abds_dict[group_id] = np.sum( abundances[extant_type_indices[np.where((functypes == group_trait_profile).all(axis=1))[0]]] )
+        # print("@@@")
         if(relative_abundance):
-            group_abds_dict[group_id] /= np.sum(system.get_type_abundance(t_index=t_idx))
+            group_abds_dict[group_id] /= total_abundance
     #----------------------------------
     return group_abds_dict
 
@@ -144,8 +156,9 @@ def turnover_metric(abundances_t0, abundances_tf, inverse=False):
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False, mode='branchings'):
-    clade_abds_t0_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=t0, relative_abundance=True, mode='branchings')
-    clade_abds_tf_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=tf, relative_abundance=True, mode='branchings')
+    clade_abds_t0_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=t0, relative_abundance=True, mode=mode)
+    # print("clade_abds_t0_dict", clade_abds_t0_dict)
+    clade_abds_tf_dict = get_phylogenetic_group_abundances(system, phylogeny_depth, t=tf, relative_abundance=True, mode=mode)
     for i, clade_id in enumerate(clade_abds_t0_dict.keys()):
         if(clade_id not in clade_abds_tf_dict):
             clade_abds_tf_dict[clade_id] = 0
@@ -155,7 +168,11 @@ def phylogenetic_group_turnover(system, phylogeny_depth, t0, tf, inverse=False, 
     # print('clade_abds_t0_dict', clade_abds_t0_dict)
     # print('clade_abds_tf_dict', clade_abds_tf_dict)
     #----------------------------------
+    # print( sorted(clade_abds_t0_dict.keys()) )
     clade_abds_t0    = np.array([clade_abds_t0_dict[clade_id] for clade_id in sorted(clade_abds_t0_dict.keys())])
+    # print(clade_abds_t0)
+    # print('-.-')
+    # exit()
     clade_abds_tf    = np.array([clade_abds_tf_dict[clade_id] for clade_id in sorted(clade_abds_tf_dict.keys())])
     clade_relabds_t0 = clade_abds_t0/np.sum(clade_abds_t0)
     clade_relabds_tf = clade_abds_tf/np.sum(clade_abds_tf)
@@ -210,7 +227,7 @@ def phylogenetic_group_diversity(system, phylogeny_depth, t=None, t_index=None, 
     t_idx = np.argmax(system.t_series >= t) if t is not None else t_index if t_index is not None else -1
     #----------------------------------
     if(metric == 'shannon'):
-        abundances = list( get_phylogenetic_group_abundances(system, phylogeny_depth, t_index=t_idx, relative_abundance=True).values(), mode='branchings' )
+        abundances = list( get_phylogenetic_group_abundances(system, phylogeny_depth, t_index=t_idx, relative_abundance=True, mode=mode).values() )
         abundances = abundances/np.sum(abundances)
         entropy = scipy.stats.entropy(abundances)
         diversity = entropy
