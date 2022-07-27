@@ -336,6 +336,36 @@ def get_stats(vals, prefix=None, include_last=False):
             }
     return stats
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def logistic_curve(x, m, k):
+    return 1/(1 + np.exp(k*(x - m)))
+
+def fit_logistic_curve(data_x, data_y, m_init=0, k_init=1, bounds=None, weights=None, interp_xmax=100):
+
+    import sklearn.metrics
+    
+    def calc_logistic_rmse(logistic_params, data_x, data_y, weights=None):
+        m, k        = logistic_params
+        logistic_x  = np.arange(0, np.max(data_x)*2, step=0.01, dtype=np.float128)
+        logistic_y  = logistic_curve(logistic_x, m, k)
+        logistic_fn = scipy.interpolate.interp1d(logistic_x, logistic_y)
+        #----------
+        rmse        = sklearn.metrics.mean_squared_error(y_true=logistic_fn(data_x), y_pred=data_y, sample_weight=weights)
+        return rmse
+    
+    res = scipy.optimize.minimize(calc_logistic_rmse, x0=[m_init, k_init], args=(data_x, data_y, weights), method='Nelder-Mead', bounds=bounds)
+    
+    fit_logistic_params = res['x']
+    fit_m               = fit_logistic_params[0]
+    fit_k               = fit_logistic_params[1]
+    
+    fit_logistic_x  = np.arange(0, interp_xmax, step=0.01, dtype=np.float128)
+    fit_logistic_y  = logistic_curve(fit_logistic_x, fit_m, fit_k)
+    fit_logistic_fn = scipy.interpolate.interp1d(fit_logistic_x, fit_logistic_y)
+    
+    return (fit_logistic_fn, fit_m, fit_k)
+
 
 
 

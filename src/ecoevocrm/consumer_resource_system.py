@@ -292,12 +292,12 @@ class ConsumerResourceSystem():
             #------------------------------
             
             sol = scipy.integrate.solve_ivp(self.dynamics, 
-                                             y0     = init_cond,
-                                             args   = params,
-                                             t_span = (self.t, self.t+T),
-                                             t_eval = np.arange(start=self.t, stop=self.t+T+dt, step=dt) if dt is not None else None,
-                                             events = events,
-                                             method = _integration_method,
+                                             y0       = init_cond,
+                                             args     = params,
+                                             t_span   = (self.t, self.t+T),
+                                             t_eval   = np.arange(start=self.t, stop=self.t+T+dt, step=dt) if dt is not None else None,
+                                             events   = events,
+                                             method   = _integration_method,
                                              max_step = self.max_time_step )
 
             #------------------------------
