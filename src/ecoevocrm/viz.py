@@ -191,7 +191,7 @@ def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineag
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def resource_plot(system, ax=None, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False, stacked=False, relative=False, resource_colors=None, palette='hls', linewidth=None, edgecolor=None, legend=True):
+def resource_plot(system, ax=None, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False, stacked=False, relative=False, resource_colors=None, palette='terrain', linewidth=None, edgecolor=None, legend=True):
 
     if(t_max is None):
         t_max = np.max(system.t_series)
