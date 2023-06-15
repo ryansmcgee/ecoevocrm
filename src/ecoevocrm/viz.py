@@ -37,7 +37,10 @@ def matrix_plot(mat, ax=None, cmap=None, vmin=None, vmax=None, center=None, cbar
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
-                             color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
+                             color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01, seed=None):
+
+    self.seed = np.random.randint(low=0, high=1e9) if seed is None else seed
+        np.random.seed(self.seed)
 
     # TODO: Make the range of random updates to child color based on phenotype or fitness difference between parent and child
 
@@ -92,10 +95,12 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', high
 def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None, t_downsample='default', log_x_axis=False,
                             type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
                             color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01,
-                            linewidth=None, edgecolor=None):
+                            linewidth=None, edgecolor=None, seed=None):
 
     if(type_colors is None):
-        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min)
+        self.seed = np.random.randint(low=0, high=1e9) if seed is None else seed
+        np.random.seed(self.seed)
+        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min, seed=seed)
 
     if(t_max is None):
         t_max = np.max(system.t_series)
