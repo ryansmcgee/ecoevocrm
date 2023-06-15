@@ -304,7 +304,7 @@ class ConsumerResourceSystem():
             #------------------------------
 
             N_epoch = np.zeros(shape=(self._N_series.shape[0], len(sol.t)))
-            N_epoch[self._active_type_indices] = sol.y[:num_extant_types]
+            N_epoch[self._active_type_indices] = np.maximum(sol.y[:num_extant_types], 0) # reset negative values to 0
             
             R_epoch = sol.y[-1-self.resource_set.num_resources:-1]
             
