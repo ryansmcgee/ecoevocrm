@@ -120,7 +120,7 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineage_ids=True, show_phenotypes=True,
+def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineage_ids=True, show_phenotypes=True, annot_extinct=False,
                    type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
                    color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
     
@@ -154,21 +154,20 @@ def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineag
             if(parent_idx is not None):
                 ax.plot([t_birth, t_birth], [ypos_parent, ypos_i], color=type_colors[parent_idx], ls='--', lw=0.5, zorder=-99)
 
-            if(N_i_end > 0):
-                ax.plot([t_death, t_death+t_death*0.2], [ypos_i, ypos_i], color='#999999', ls=':', lw=0.5)
-                ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90)
+            if(N_i_end > 0 or annot_extinct):
+                
+                if(N_i_end > 0):
+                    ax.plot([t_death, t_death+t_death*0.2], [ypos_i, ypos_i], color='#999999', ls=':', lw=0.5)
+                    ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90)
                 
                 if(show_lineage_ids):
-                    # print(system.type_set.xi)
-                    # print(system.type_set.xi.ravel())
-                    # print(system.type_set.xi.ravel()[i])
-                    # print(len(system.type_set.xi.ravel()) > 1)
+
                     ax.annotate(system.type_set.lineage_ids[i] 
                                     + ('  ' + ''.join(['X' if system.type_set.sigma[i][j] > 0 else '-' for j in range(system.type_set.num_traits)]) if show_phenotypes else '')
                                     + ('  ' + "{0:.6f}".format(system.type_set.xi.ravel()[i] if isinstance(system.type_set.xi, np.ndarray) else system.type_set.xi ))
                                     , 
                                 xy=(t_death+t_death*0.35, ypos_i), color=type_colors[i], fontsize=2, xycoords='data', annotation_clip=False)
-                
+
         except:
             pass
 

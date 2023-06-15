@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import scipy
 
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -77,18 +78,27 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
     # Generate random values according to one of the following random models:
     #--------------------------------
     if(mode == 'bernoulli'):
-        M = np.random.binomial(n=1, p=(args['p'] if 'p' in args else 0.5), size=shape )
+        M = np.random.binomial(n=1, p=(args['p'] if 'p' in args else 0.5), size=shape)
     elif(mode == 'binomial'):
-        M = np.random.binomial(n=(args['n'] if 'n' in args else 1), p=(args['p'] if 'p' in args else 0.5), size=shape )
+        M = np.random.binomial(n=(args['n'] if 'n' in args else 1), p=(args['p'] if 'p' in args else 0.5), size=shape)
     elif(mode == 'uniform'):
-        M = np.random.uniform(low=(args['min'] if 'min' in args else 0), high=(args['max'] if 'max' in args else 1), size=shape )
+        M = np.random.uniform(low=(args['min'] if 'min' in args else 0), high=(args['max'] if 'max' in args else 1), size=shape)
     elif(mode == 'normal'):
-        M = np.random.normal(loc=(args['mean'] if 'mean' in args else 0), scale=(args['std'] if 'std' in args else 1), size=shape )
+        M = np.random.normal(loc=(args['mean'] if 'mean' in args else 0), scale=(args['std'] if 'std' in args else 1), size=shape)
     elif(mode == 'logistic'):
-        M = np.random.logistic(loc=(args['mean'] if 'mean' in args else 0), scale=(args['scale'] if 'scale' in args else 1), size=shape )
+        M = np.random.logistic(loc=(args['mean'] if 'mean' in args else 0), scale=(args['scale'] if 'scale' in args else 1), size=shape)
     elif(mode == 'exponential'):
-        M = np.random.exponential(scale=(args['scale'] if 'scale' in args else 1), size=shape )
+        M = np.random.exponential(scale=(args['scale'] if 'scale' in args else 1), size=shape)
         M *=  np.random.choice([1, -1], size=shape)
+    elif(mode == 'laplace'):
+        M = np.random.laplace(loc=(args['mean'] if 'mean' in args else 0), scale=(args['scale'] if 'scale' in args else 1), size=shape)
+    elif(mode == 'cauchy'):
+        M = scipy.stats.cauchy.rvs(loc=(args['mean'] if 'mean' in args else 0), scale=(args['scale'] if 'scale' in args else 1), size=shape)
+    elif(mode == 'exponential_normal'):
+        loc   = args['mean'] if 'mean' in args else 0
+        scale = args['scale'] if 'scale' in args else 1
+        rate  = args['shape'] if 'shape' in args else args['rate'] if 'rate' in args else 1
+        M = scipy.stats.exponnorm.rvs(K=1/(scale*rate), loc=loc, scale=rate, size=shape)
     elif(mode == 'gamma'):
         mean     = (args['mean'] if 'mean' in args else 0)
         coeffvar = (args['coeffvar'] if 'coeffvar' in args else args['cv'] if 'cv' in args else 0)
@@ -103,7 +113,7 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
         for i, j in np.ndindex(M.shape):
             if(i >= j):
                 continue
-            M[i,j] = np.random.normal( loc=0, scale=J_0*(1/(1 + np.exp((max(i,j) - n_star)/delta))) )
+            M[i,j] = np.random.normal( loc=0, scale=J_0*(1/(1 + np.exp((max(i+1, j+1) - n_star)/delta))) )   # +1s because i,j indices start at 0
     elif(mode == 'tikhonov_sigmoid_ordered'):
         J_0    = args['J_0'] if 'J_0' in args else 0.4
         n_star = args['n_star'] if 'n_star' in args else 10
@@ -299,21 +309,8 @@ def brownian_series(T, dt=1, lamda=1, eta_mean=0, eta_std=1, k=0, y0=0, v0=0, L=
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# def get_boltzmann_temp_for_entropy(energy, target_entropy):
-#     import scipy
-#     def entropy_diff(beta, energy, target_entropy):
-#         boltzmann_dist = np.exp(-beta * energy) / np.sum(np.exp(-beta * energy))
-#         boltzmann_entropy = scipy.stats.entropy(boltzmann_dist)
-#         return np.abs(boltzmann_entropy - target_entropy)
-#     res = scipy.optimize.minimize(entropy_diff, x0=1, args=(energy, target_entropy), method='Nelder-Mead')
-#     beta_fit = res['x'][0]
-#     return beta_fit
-
 def get_boltzmann_temp_for_entropy(energy, target_entropy):
     def entropy_diff(beta, energy, target_entropy):
-        # boltzmann_dist = np.exp(-beta * energy.astype(np.float128))
-        # boltzmann_dist = boltzmann_dist.astype(np.float64)
-        # boltzmann_dist /= boltzmann_dist.astype(np.float128).sum()
         boltzmann_dist = ( np.exp(-beta * energy.astype(np.float128)) / np.sum(np.exp(-beta * energy.astype(np.float128))) ).astype(np.float64)
         boltzmann_entropy = scipy.stats.entropy(boltzmann_dist)
         return np.abs(boltzmann_entropy - target_entropy)
@@ -347,7 +344,7 @@ def fit_logistic_curve(data_x, data_y, m_init=0, k_init=1, bounds=None, weights=
     
     def calc_logistic_rmse(logistic_params, data_x, data_y, weights=None):
         m, k        = logistic_params
-        logistic_x  = np.arange(0, np.max(data_x)*2, step=0.01, dtype=np.float128)
+        logistic_x  = np.arange(0, np.nanmax(data_x)*2, step=0.01, dtype=np.float128)
         logistic_y  = logistic_curve(logistic_x, m, k)
         logistic_fn = scipy.interpolate.interp1d(logistic_x, logistic_y)
         #----------
@@ -366,8 +363,50 @@ def fit_logistic_curve(data_x, data_y, m_init=0, k_init=1, bounds=None, weights=
     
     return (fit_logistic_fn, fit_m, fit_k)
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def tanh_curve(x, m, k):
+    return (1 + np.exp(-k*(x - m)))/(1 + np.exp(-k*(x - m)))
+
+def fit_tanh_curve(data_x, data_y, m_init=0, k_init=1, bounds=None, weights=None, interp_xmax=100):
+
+    import sklearn.metrics
+    
+    def calc_tanh_rmse(tanh_params, data_x, data_y, weights=None):
+        m, k    = tanh_params
+        tanh_x  = np.arange(0, np.nanmax(data_x)*2, step=0.01, dtype=np.float128)
+        tanh_y  = tanh_curve(tanh_x, m, k)
+        tanh_fn = scipy.interpolate.interp1d(tanh_x, tanh_y)
+        #----------
+        rmse    = sklearn.metrics.mean_squared_error(y_true=tanh_fn(data_x), y_pred=data_y, sample_weight=weights)
+        return rmse
+    
+    res = scipy.optimize.minimize(calc_tanh_rmse, x0=[m_init, k_init], args=(data_x, data_y, weights), method='Nelder-Mead', bounds=bounds)
+    
+    fit_tanh_params = res['x']
+    fit_m               = fit_tanh_params[0]
+    fit_k               = fit_tanh_params[1]
+    
+    fit_tanh_x  = np.arange(0, interp_xmax, step=0.01, dtype=np.float128)
+    fit_tanh_y  = tanh_curve(fit_tanh_x, fit_m, fit_k)
+    fit_tanh_fn = scipy.interpolate.interp1d(fit_tanh_x, fit_tanh_y)
+    
+    return (fit_tanh_fn, fit_m, fit_k)
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def unit_vector(vector):
+    # Returns the unit vector of the vector."""
+    return vector / np.linalg.norm(vector)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def angle_between(v1, v2):
+    # Returns the angle in radians between vectors 'v1' and 'v2'::
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
 
 

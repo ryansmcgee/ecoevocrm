@@ -3,7 +3,7 @@ from setuptools import setup, find_namespace_packages
 import pathlib
 
 APP_NAME = "ecoevocrm"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 LICENSE = "MIT"
 AUTHOR = "Ryan Seamus McGee"
 DESCRIPTION = "Computational frameworks for extended consumer resource models of eco-evoutionary community dynamics."

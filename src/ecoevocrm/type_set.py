@@ -189,9 +189,7 @@ class TypeSet():
             costs += self.chi_cost_terms
             costs += self.J_cost_terms
             if(np.any(costs < 0)):
-                neg_indices = np.where(costs < 0)[0]
-                print("Warning: Negative energy_costs encountered for one or more types; capping energy_costs to 0")
-                costs = costs.clip(min=0)
+                raise ValueError('Negative energy_costs encountered for one or more types.')
             self._energy_costs = utils.ExpandableArray(costs)
         return TypeSet.get_array(self._energy_costs).ravel()
 
@@ -494,6 +492,12 @@ class TypeSet():
 
     def get_num_mutations(self):
         return np.array(self.get_lineage_depths()) - 1
+
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_phenotype_strings(self):
+        return [ ''.join(['1' if sigma_vector[i] != 0 else '0' for i in range(len(sigma_vector))]) for sigma_vector in self.sigma ]
 
 
 
