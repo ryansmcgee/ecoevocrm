@@ -100,7 +100,7 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
     if(type_colors is None):
         color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
         np.random.seed(color_seed)
-        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min, seed=seed)
+        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min, color_seed=color_seed)
 
     if(t_max is None):
         t_max = np.max(system.t_series)
