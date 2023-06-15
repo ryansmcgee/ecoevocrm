@@ -40,7 +40,7 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', high
                              color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01, color_seed=None):
 
     color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
-    np.random.seed(self.color_seed)
+    np.random.seed(color_seed)
 
     # TODO: Make the range of random updates to child color based on phenotype or fitness difference between parent and child
 
@@ -99,7 +99,7 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
 
     if(type_colors is None):
         color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
-        np.random.seed(self.color_seed)
+        np.random.seed(color_seed)
         type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min, seed=seed)
 
     if(t_max is None):
