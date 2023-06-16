@@ -27,7 +27,7 @@ setup(
     install_requires=[
         "numpy",
         "scipy",
-        "sklearn",
+        "scikit-learn",
         "pandas",
         "matplotlib",
         "argparse"
