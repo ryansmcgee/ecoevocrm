@@ -66,7 +66,7 @@ class TypeSet():
         self._gamma  = self.preprocess_params(gamma, has_trait_dim=False)
         self._xi     = self.preprocess_params(xi,    has_trait_dim=False, force_expandable_array=(mean_xi_mut > 0))
         self._mu     = self.preprocess_params(mu,    has_trait_dim=False)
-        self._chi    = self.preprocess_params(chi, has_trait_dim=True) if chi is not None else None
+        self._chi    = self.preprocess_params(chi,   has_trait_dim=True) if chi is not None else None
         self._J      = utils.reshape(J, shape=(self.num_traits, self.num_traits)) if J is not None else None
 
         self._mean_xi_mut = mean_xi_mut
