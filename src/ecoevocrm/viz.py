@@ -45,8 +45,8 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', high
     # TODO: Make the range of random updates to child color based on phenotype or fitness difference between parent and child
 
     num_palette_types = 0
-    lineage_ids = np.asarray(type_set.lineage_ids)
-    for lineage_id in lineage_ids:
+    lineageIDs = np.asarray(type_set.lineageIDs)
+    for lineage_id in lineageIDs:
         if(lineage_id.count('.') == apply_palette_depth):
             num_palette_types += 1
 
@@ -64,7 +64,7 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', high
             return
         parent_color_rgb   = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4)) if ('#' in parent_color and len(parent_color)==7) else parent_color
         for lineage_id, descendants in d.items():
-            type_idx       = np.argmax(lineage_ids == lineage_id)
+            type_idx       = np.argmax(lineageIDs == lineage_id)
             if(depth == apply_palette_depth):
                 type_color = palette[next_palette_color_idx]
                 next_palette_color_idx += 1
@@ -82,9 +82,9 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', high
     color_subtree(type_set.phylogeny, parent_color=root_color, depth=0, next_palette_color_idx=0)
 
     if(not (isinstance(highlight_clades, str) and highlight_clades == 'all')):
-        lineage_ids = np.asarray([lid+'.' for lid in lineage_ids])
+        lineageIDs = np.asarray([lid+'.' for lid in lineageIDs])
         for i, color in enumerate(type_colors):
-            if(not any(lineage_ids[i].startswith(str(highlight_id).strip('.')+'.') for highlight_id in highlight_clades)):
+            if(not any(lineageIDs[i].startswith(str(highlight_id).strip('.')+'.') for highlight_id in highlight_clades)):
                 type_colors[i] = [type_colors[i][0]]*3
 
     return type_colors
@@ -125,7 +125,7 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineage_ids=True, show_phenotypes=True, annot_extinct=False,
+def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineageIDs=True, show_phenotypes=True, annot_extinct=False,
                    type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
                    color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
     
@@ -165,9 +165,9 @@ def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineag
                     ax.plot([t_death, t_death+t_death*0.2], [ypos_i, ypos_i], color='#999999', ls=':', lw=0.5)
                     ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90)
                 
-                if(show_lineage_ids):
+                if(show_lineageIDs):
 
-                    ax.annotate(system.type_set.lineage_ids[i] 
+                    ax.annotate(system.type_set.lineageIDs[i] 
                                     + ('  ' + ''.join(['X' if system.type_set.sigma[i][j] > 0 else '-' for j in range(system.type_set.num_traits)]) if show_phenotypes else '')
                                     + ('  ' + "{0:.6f}".format(system.type_set.xi.ravel()[i] if isinstance(system.type_set.xi, np.ndarray) else system.type_set.xi ))
                                     , 
