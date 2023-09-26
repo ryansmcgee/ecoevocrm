@@ -14,7 +14,7 @@ class TypeSet():
                        kappa       = 1e10,
                        eta         = 1,
                        lamda       = 0,
-                       gamma       = 1,
+                       growthfactor       = 1,
                        xi          = 0,
                        chi         = None,
                        J           = None,
@@ -70,8 +70,8 @@ class TypeSet():
         self._eta    = self.preprocess_params(eta,   has_trait_dim=True)
         # print("_lamda ...")
         self._lamda  = self.preprocess_params(lamda, has_trait_dim=True)
-        # print("_gamma ...")
-        self._gamma  = self.preprocess_params(gamma, has_trait_dim=False)
+        # print("_growthfactor ...")
+        self._growthfactor  = self.preprocess_params(growthfactor, has_trait_dim=False)
         # print("_xi ...")
         self._xi     = self.preprocess_params(xi,    has_trait_dim=False) #, force_expandable_array=(mean_xi_mut > 0))
         # print("_chi ...")
@@ -158,12 +158,12 @@ class TypeSet():
         self._lamda = self.preprocess_params(vals, has_trait_dim=True)
 
     @property
-    def gamma(self):
-        return TypeSet.get_array(self._gamma)
+    def growthfactor(self):
+        return TypeSet.get_array(self._growthfactor)
 
-    @gamma.setter
-    def gamma(self, vals):
-        self._gamma = self.preprocess_params(vals, has_trait_dim=False)
+    @growthfactor.setter
+    def growthfactor(self, vals):
+        self._growthfactor = self.preprocess_params(vals, has_trait_dim=False)
 
     @property
     def xi(self):
@@ -335,7 +335,7 @@ class TypeSet():
     #     kappa_mut = np.repeat(self.kappa, repeats=sigma_mut.shape[0], axis=0) if self.kappa.ndim == 2 else self.kappa
     #     eta_mut   = np.repeat(self.eta,   repeats=sigma_mut.shape[0], axis=0) if self.eta.ndim == 2   else self.eta
     #     lamda_mut = np.repeat(self.lamda, repeats=sigma_mut.shape[0], axis=0) if self.lamda.ndim == 2 else self.lamda
-    #     gamma_mut = np.repeat(self.gamma, repeats=sigma_mut.shape[0], axis=0) if self.gamma.ndim == 2 else self.gamma
+    #     growthfactor_mut = np.repeat(self.growthfactor, repeats=sigma_mut.shape[0], axis=0) if self.growthfactor.ndim == 2 else self.growthfactor
     #     xi_mut    = np.repeat(self.xi,    repeats=sigma_mut.shape[0], axis=0) if self.xi.ndim == 2    else self.xi
     #     chi_mut   = np.repeat(self.chi,   repeats=sigma_mut.shape[0], axis=0) if self.chi.ndim == 2   else self.chi
     #     mu_mut    = np.repeat(self.mu,    repeats=sigma_mut.shape[0], axis=0) if self.mu.ndim == 2    else self.mu
@@ -345,7 +345,7 @@ class TypeSet():
     #     # else:
     #     #     xi_mut = np.repeat(self.xi, repeats=sigma_mut.shape[0], axis=0) if self.xi.ndim == 2 else self.xi
     #     #----------------------------------
-    #     mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, gamma=gamma_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, # mean_xi_mut=self._mean_xi_mut,
+    #     mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, growthfactor=growthfactor_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, # mean_xi_mut=self._mean_xi_mut,
     #                          # normalize_phenotypes=self.normalize_phenotypes, 
     #                          binarize_traits_chi_cost_terms=self.binarize_traits_chi_cost_terms, binarize_traits_J_cost_terms=self.binarize_traits_J_cost_terms)
     #     #----------------------------------
@@ -362,7 +362,7 @@ class TypeSet():
         kappa_mut            = [] if self.kappa.ndim == 2 else self.kappa
         eta_mut              = [] if self.eta.ndim == 2 else self.eta
         lamda_mut            = [] if self.lamda.ndim == 2 else self.lamda
-        gamma_mut            = [] if self.gamma.ndim == 2 else self.gamma
+        growthfactor_mut            = [] if self.growthfactor.ndim == 2 else self.growthfactor
         xi_mut               = [] if self.xi.ndim == 2 else self.xi
         chi_mut              = [] if self.chi.ndim == 2 else self.chi
         mu_mut               = [] if self.mu.ndim == 2 else self.mu
@@ -381,7 +381,7 @@ class TypeSet():
                     if(self.kappa.ndim == 2):   kappa_mut.append(self.kappa[parent_idx])
                     if(self.eta.ndim == 2):     eta_mut.append(  self.eta[parent_idx])
                     if(self.lamda.ndim == 2):   lamda_mut.append(self.lamda[parent_idx])
-                    if(self.gamma.ndim == 2):   gamma_mut.append(self.gamma[parent_idx])
+                    if(self.growthfactor.ndim == 2):   growthfactor_mut.append(self.growthfactor[parent_idx])
                     if(self.xi.ndim == 2):      xi_mut.append(self.xi[parent_idx])
                     if(self.chi.ndim == 2):     chi_mut.append(self.chi[parent_idx])
                     if(self.mu.ndim == 2):      mu_mut.append(self.mu[parent_idx])
@@ -392,7 +392,7 @@ class TypeSet():
                     # - - - - -
                     mutant_indices[p].append(len(sigma_mut)-1)
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, gamma=gamma_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, 
+        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, growthfactor=growthfactor_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, 
                              generation_rates=generation_rates_mut, parent_indices=parent_indices_mut,
                              binarize_traits_chi_cost_terms=self.binarize_traits_chi_cost_terms, binarize_traits_J_cost_terms=self.binarize_traits_J_cost_terms)
         #----------------------------------
@@ -404,7 +404,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, type_set=None, sigma=None, beta=None, kappa=None, eta=None, lamda=None, gamma=None, xi=None, chi=None, mu=None, generation_rates=None, parent_index=None, parent_id=None, ref_type_idx=None): # type_index=None, mean_xi_mut=None, 
+    def add_type(self, type_set=None, sigma=None, beta=None, kappa=None, eta=None, lamda=None, growthfactor=None, xi=None, chi=None, mu=None, generation_rates=None, parent_index=None, parent_id=None, ref_type_idx=None): # type_index=None, mean_xi_mut=None, 
         parent_idx   = np.where(self.typeIDs==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
@@ -419,7 +419,7 @@ class TypeSet():
                                          kappa=kappa if kappa is not None else self.kappa[ref_type_idx],  
                                          eta=eta if eta is not None else self.eta[ref_type_idx],  
                                          lamda=lamda if lamda is not None else self.lamda[ref_type_idx],  
-                                         gamma=gamma if gamma is not None else self.gamma[ref_type_idx],  
+                                         growthfactor=growthfactor if growthfactor is not None else self.growthfactor[ref_type_idx],  
                                          xi=xi if xi is not None else self.xi[ref_type_idx],  
                                          chi=chi if chi is not None else self.chi[ref_type_idx], 
                                          mu=mu if mu is not None else self.mu[ref_type_idx],
@@ -437,7 +437,7 @@ class TypeSet():
         self._kappa = self._kappa.add(added_type_set.kappa) if isinstance(self._kappa, utils.ExpandableArray) else self._kappa
         self._eta   = self._eta.add(added_type_set.eta)     if isinstance(self._eta,   utils.ExpandableArray) else self._eta
         self._lamda = self._lamda.add(added_type_set.lamda) if isinstance(self._lamda, utils.ExpandableArray) else self._lamda
-        self._gamma = self._gamma.add(added_type_set.gamma) if isinstance(self._gamma, utils.ExpandableArray) else self._gamma
+        self._growthfactor = self._growthfactor.add(added_type_set.growthfactor) if isinstance(self._growthfactor, utils.ExpandableArray) else self._growthfactor
         self._xi    = self._xi.add(added_type_set.xi)       if isinstance(self._xi,    utils.ExpandableArray) else self._xi
         self._chi   = self._chi.add(added_type_set.chi)     if isinstance(self._chi,   utils.ExpandableArray) else self._chi
         self._mu    = self._mu.add(added_type_set.mu)       if isinstance(self._mu,    utils.ExpandableArray) else self._mu
@@ -507,7 +507,7 @@ class TypeSet():
                         kappa = self.kappa[type_idx] if self.kappa.ndim == 2  else self.kappa, 
                         eta   = self.eta[type_idx]   if self.eta.ndim == 2    else self.eta, 
                         lamda = self.lamda[type_idx] if self.lamda.ndim == 2  else self.lamda, 
-                        gamma = self.gamma[type_idx] if self.gamma.ndim == 2  else self.gamma, 
+                        growthfactor = self.growthfactor[type_idx] if self.growthfactor.ndim == 2  else self.growthfactor, 
                         xi    = self.xi[type_idx]    if self.xi.ndim == 2     else self.xi, 
                         chi   = self.chi[type_idx]   if self.chi.ndim == 2    else self.chi, 
                         mu    = self.mu[type_idx]    if self.mu.ndim == 2     else self.mu,
@@ -574,7 +574,7 @@ class TypeSet():
     #             'kappa':        self.kappa if self.kappa.ndim < 2 else self.kappa[type_idx],
     #             'eta':          self.eta   if self.eta.ndim < 2   else self.eta[type_idx],
     #             'lamda':        self.lamda if self.lamda.ndim < 2 else self.lamda[type_idx],
-    #             'gamma':        self.gamma if self.gamma.ndim < 2 else self.gamma[type_idx],
+    #             'growthfactor':        self.growthfactor if self.growthfactor.ndim < 2 else self.growthfactor[type_idx],
     #             'xi':           self.xi    if self.xi.ndim < 2    else self.xi[type_idx],
     #             'chi':          self.chi   if self.chi.ndim < 2   else self.chi[type_idx],
     #             'J':            self.J,
@@ -592,7 +592,7 @@ class TypeSet():
     #             'kappa':        self.kappa if self.kappa.ndim < 2 else self.kappa[type_idx],
     #             'eta':          self.eta   if self.eta.ndim < 2   else self.eta[type_idx],
     #             'lamda':        self.lamda if self.lamda.ndim < 2 else self.lamda[type_idx],
-    #             'gamma':        self.gamma if self.gamma.ndim < 2 else self.gamma[type_idx],
+    #             'growthfactor':        self.growthfactor if self.growthfactor.ndim < 2 else self.growthfactor[type_idx],
     #             'xi':           self.xi    if self.xi.ndim < 2    else self.xi[type_idx],
     #             'chi':          self.chi   if self.chi.ndim < 2   else self.chi[type_idx],
     #             'J':            self.J,
@@ -610,7 +610,7 @@ class TypeSet():
                 'kappa':        self.kappa if self.kappa.ndim < 2 else self.kappa[type_idx],
                 'eta':          self.eta   if self.eta.ndim < 2   else self.eta[type_idx],
                 'lamda':        self.lamda if self.lamda.ndim < 2 else self.lamda[type_idx],
-                'gamma':        self.gamma if self.gamma.ndim < 2 else self.gamma[type_idx],
+                'growthfactor':        self.growthfactor if self.growthfactor.ndim < 2 else self.growthfactor[type_idx],
                 'xi':           self.xi    if self.xi.ndim < 2    else self.xi[type_idx],
                 'chi':          self.chi   if self.chi.ndim < 2   else self.chi[type_idx],
                 'J':            self.J,
@@ -633,7 +633,7 @@ class TypeSet():
         self._kappa = self._kappa.reorder(type_order) if isinstance(self._kappa, utils.ExpandableArray) else self._kappa
         self._eta   = self._eta.reorder(type_order)   if isinstance(self._eta,   utils.ExpandableArray) else self._eta
         self._lamda = self._lamda.reorder(type_order) if isinstance(self._lamda, utils.ExpandableArray) else self._lamda
-        self._gamma = self._gamma.reorder(type_order) if isinstance(self._gamma, utils.ExpandableArray) else self._gamma
+        self._growthfactor = self._growthfactor.reorder(type_order) if isinstance(self._growthfactor, utils.ExpandableArray) else self._growthfactor
         self._xi    = self._xi.reorder(type_order)    if isinstance(self._xi,    utils.ExpandableArray) else self._xi
         self._chi   = self._chi.reorder(type_order)   if isinstance(self._chi,   utils.ExpandableArray) else self._chi
         self._mu    = self._mu.reorder(type_order)    if isinstance(self._mu,    utils.ExpandableArray) else self._mu
