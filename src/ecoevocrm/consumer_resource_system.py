@@ -14,6 +14,7 @@ import ecoevocrm.utils as utils
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class ConsumerResourceSystem():
+
     # Define Class constants:
     RESOURCE_DYNAMICS_FASTEQ = 0
     RESOURCE_DYNAMICS_EXPLICIT = 1
@@ -22,37 +23,37 @@ class ConsumerResourceSystem():
     RESOURCE_CROSSFEEDING_HETEROTYPES = 2
 
     def __init__(self,
-                 type_set=None,
-                 resource_set=None,
-                 N_init=None,
-                 R_init=None,
-                 num_types=None,
-                 num_resources=None,
+                 type_set          = None,
+                 resource_set      = None,
+                 N_init            = None,
+                 R_init            = None,
+                 num_types         = None,
+                 num_resources     = None,
                  # TypeSet params:
-                 traits=None,  # previously sigma
-                 consumption_rate=1,  # previously beta
-                 carrying_capacity=1e10,  # previously kappa
-                 growth_factor=1,  # previously gamma
-                 energy_passthru=0,  # previously lamda
-                 cost_baseline=0,  # previously xi
-                 cost_trait=None,  # previously chi
-                 cost_interaction=None,  # previously J
-                 mutation_rate=1e-10,  # previously mu
+                 traits            = None,  # previously sigma
+                 consumption_rate  = 1,  # previously beta
+                 carrying_capacity = 1e10,  # previously kappa
+                 growth_factor     = 1,  # previously gamma
+                 energy_passthru   = 0,  # previously lamda
+                 cost_baseline     = 0,  # previously xi
+                 cost_trait        = None,  # previously chi
+                 cost_interaction  = None,  # previously J
+                 mutation_rate     = 1e-10,  # previously mu
                  # ResourceSet params:
-                 influx_rate=1,  # previously rho
-                 decay_rate=1,  # previously tau
-                 energy_content=1,  # previously omega
-                 cross_production=None,  # previously D
+                 influx_rate       = 1,  # previously rho
+                 decay_rate        = 1,  # previously tau
+                 energy_content    = 1,  # previously omega
+                 cross_production  = None,  # previously D
                  # Simulation params:
-                 resource_dynamics_mode='fasteq',
-                 threshold_min_abs_abundance=1,
-                 threshold_min_rel_abundance=0,
-                 threshold_eq_abundance_change=1e4,
-                 threshold_precise_integrator=1e2,
-                 check_event_low_abundance=True,
-                 convergent_lineages=True,
-                 max_time_step=np.inf,
-                 seed=None):
+                 resource_dynamics_mode        ='fasteq',
+                 threshold_min_abs_abundance   = 1, # TODO: Consider making (option for) min abd to be set to establishment abd i.e., 1/fitness (or multiple thereof)
+                 threshold_min_rel_abundance   = 0,
+                 threshold_eq_abundance_change = 1e4,
+                 threshold_precise_integrator  = 1e2,
+                 check_event_low_abundance     = True,
+                 convergent_lineages           = True,
+                 max_time_step                 = np.inf,
+                 seed                          = None):
 
         #----------------------------------
 
@@ -100,10 +101,8 @@ class ConsumerResourceSystem():
                 utils.error(f"Error in ConsumerResourceSystem __init__(): type_set argument expects object of TypeSet type.")
         else:
             self.type_set = TypeSet(num_types=system_num_types, num_traits=system_num_resources, traits=traits,
-                                    consumption_rate=consumption_rate, carrying_capacity=carrying_capacity,
-                                    energy_passthru=energy_passthru, growth_factor=growth_factor,
-                                    cost_baseline=cost_baseline, cost_trait=cost_trait,
-                                    cost_interaction=cost_interaction, mutation_rate=mutation_rate)
+                                    consumption_rate=consumption_rate, carrying_capacity=carrying_capacity, energy_passthru=energy_passthru, growth_factor=growth_factor,
+                                    cost_baseline=cost_baseline, cost_trait=cost_trait, cost_interaction=cost_interaction, mutation_rate=mutation_rate)
         # Check that the type set dimensions match the system dimensions:
         if(system_num_types != self.type_set.num_types):
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system types ({system_num_types}) does not match number of type set types ({self.type_set.num_types}).")
@@ -123,9 +122,7 @@ class ConsumerResourceSystem():
             else:
                 utils.error(f"Error in ConsumerResourceSystem __init__(): resource_set argument expects object of ResourceSet type.")
         else:
-            self.resource_set = ResourceSet(num_resources=system_num_resources, influx_rate=influx_rate,
-                                            decay_rate=decay_rate, energy_content=energy_content,
-                                            cross_production=cross_production)
+            self.resource_set = ResourceSet(num_resources=system_num_resources, influx_rate=influx_rate, decay_rate=decay_rate, energy_content=energy_content, cross_production=cross_production)
         # Check that the type set dimensions match the system dimensions:
         if(system_num_resources != self.resource_set.num_resources):
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system resources ({system_num_resources}) does not match number of resource set resources ({self.resource_set.num_resources}).")
@@ -141,8 +138,7 @@ class ConsumerResourceSystem():
         #----------------------------------
         # Initialize system time:
         #----------------------------------
-        self._t_series = utils.ExpandableArray([0], alloc_shape=(1, 1))
-
+        self._t_series     = utils.ExpandableArray([0], alloc_shape=(1, 1))
         self.max_time_step = max_time_step
 
         #----------------------------------
@@ -150,11 +146,11 @@ class ConsumerResourceSystem():
         #----------------------------------
         self.threshold_mutation_propensity = None  # is updated in run()
         self.threshold_eq_abundance_change = threshold_eq_abundance_change
-        self.threshold_min_abs_abundance = threshold_min_abs_abundance
-        self.threshold_min_rel_abundance = threshold_min_rel_abundance
-        self.threshold_precise_integrator = threshold_precise_integrator
-        self.check_event_low_abundance = check_event_low_abundance
-        self.convergent_lineages = convergent_lineages
+        self.threshold_min_abs_abundance   = threshold_min_abs_abundance
+        self.threshold_min_rel_abundance   = threshold_min_rel_abundance
+        self.threshold_precise_integrator  = threshold_precise_integrator
+        self.check_event_low_abundance     = check_event_low_abundance
+        self.convergent_lineages           = convergent_lineages
 
         #----------------------------------
         # Initialize system options:
@@ -172,10 +168,9 @@ class ConsumerResourceSystem():
         #----------------------------------
         # Initialize set of mutant types:
         #----------------------------------
-        # print("CRS.generate_mutant_set() ...")
         self.mutant_set = self.type_set.generate_mutant_set()
 
-        # """"""""""""""""""""""""""""""""""
+        #""""""""""""""""""""""""""""""""""
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -248,12 +243,9 @@ class ConsumerResourceSystem():
         t_end     = self.t + T
         t_elapsed = 0
 
-        self._t_series.expand_alloc(
-            (self._t_series.alloc[0], self._t_series.alloc[1] + int(T / dt if dt is not None else 10000)))
-        self._N_series.expand_alloc(
-            (self._N_series.alloc[0], self._N_series.alloc[1] + int(T / dt if dt is not None else 10000)))
-        self._R_series.expand_alloc(
-            (self._R_series.alloc[0], self._R_series.alloc[1] + int(T / dt if dt is not None else 10000)))
+        self._t_series.expand_alloc((self._t_series.alloc[0], self._t_series.alloc[1] + int(T / dt if dt is not None else 10000)))
+        self._N_series.expand_alloc((self._N_series.alloc[0], self._N_series.alloc[1] + int(T / dt if dt is not None else 10000)))
+        self._R_series.expand_alloc((self._R_series.alloc[0], self._R_series.alloc[1] + int(T / dt if dt is not None else 10000)))
 
         while (t_elapsed < T):
 
@@ -279,7 +271,6 @@ class ConsumerResourceSystem():
 
             # Get the params for the dynamics:
             params = self.get_dynamics_params(type_index=self._active_type_indices)
-            # print(f"DYNAMICS_PARAMS_EPOCH\n{params}")
 
             # Draw a random propensity threshold for triggering the next Gillespie mutation event:
             self.threshold_mutation_propensity = np.random.exponential(1)
@@ -296,7 +287,7 @@ class ConsumerResourceSystem():
             # Define the set of events that may trigger:
             events = []
             if(np.any(self.type_set.mutation_rate > 0)):
-                events.append(self.event_mutation)
+                events.append(self.event_mutant_establishment)
             if(self.check_event_low_abundance):
                 events.append(self.event_low_abundance)
 
@@ -317,15 +308,9 @@ class ConsumerResourceSystem():
             # Update the system's trajectories with latest dynamics epoch:
             #------------------------------
 
-            # print("~~~~~~~~~~~~~~~~~~~~")
-            # print("Epoch")
-            # print("t", sol.t[1:])
-
             N_epoch = np.zeros(shape=(self._N_series.shape[0], len(sol.t)))
             N_epoch[self._active_type_indices] = sol.y[:num_extant_types]
-            # print("Npre", N_epoch[:, -1])
-            N_epoch[
-                N_epoch < self.threshold_min_abs_abundance] = 0  # clip abundances below threshold_min_abs_abundance to 0
+            N_epoch[N_epoch < self.threshold_min_abs_abundance] = 0  # clip abundances below threshold_min_abs_abundance to 0
 
             R_epoch = sol.y[-1 - self.resource_set.num_resources:-1]
 
@@ -335,30 +320,23 @@ class ConsumerResourceSystem():
 
             t_elapsed = self.t - t_start
 
-            # print("Npost", N_epoch[:, -1])
-            # print("sol.t_events", sol.t_events)
-            # print("")
-
             typeCountStr = f"{num_extant_types}/{self.type_set.num_types}*({self.mutant_set.num_types})"
             #------------------------------
             # Handle events and update the system's states accordingly:
             #------------------------------
-            if(sol.status == 1):  # An event occurred
+            if(sol.status == 1):  #-> An event occurred
                 if(len(sol.t_events[0]) > 0):
                     if(np.sum(self.mutation_propensities) > 0):
                         print(f"[ Mutation event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="")  # ")#
-                        self.handle_mutation_event()
-                        # self.handle_type_loss()
+                        self.handle_mutant_establishment()
+                        # self.handle_low_abundance()
                 if(len(sol.t_events) > 1 and len(sol.t_events[1]) > 0):
                     print(f"[ Low abundance event occurred at  t={self.t:.4f} {typeCountStr}]\t\r", end="")  # ")#
-                    self.handle_type_loss()
-            elif(sol.status == 0):  # Reached end T successfully
-                self.handle_type_loss()
-            else:  # Error occurred in integration
+                    self.handle_low_abundance()
+            elif(sol.status == 0):  #-> Reached end T successfully
+                self.handle_low_abundance()
+            else:  #-> Error occurred in integration
                 utils.error("Error in ConsumerResourceSystem run(): Integration of dynamics using scipy.solve_ivp returned with error status.")
-
-            # print("Npost", self.N_series[:, -1])
-            # print("^^^^^^^^^^^^^^^^^^^^")
 
         #------------------------------
         # Finalize data series at end of integration period:
@@ -383,26 +361,16 @@ class ConsumerResourceSystem():
 
         N_t = np.zeros(num_types + num_mutants)
         N_t[:num_types] = variables[:num_types]
-
         R_t = variables[-1 - num_resources:-1]
 
         #------------------------------
 
-        # _influx_rate = influx_rate(t) if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
-
-        #------------------------------
+        # TODO: Need to add segregation to dNdt
 
         growth_rate = ConsumerResourceSystem.growth_rate(N_t, R_t, t, traits, consumption_rate, carrying_capacity, energy_passthru, growth_factor, energy_costs,
                                                          influx_rate, decay_rate, energy_content, resource_dynamics_mode, resource_influx_mode, uptake_coeffs, consumption_coeffs)
 
-        dNdt = N_t[:num_types] * growth_rate[:num_types]  # only calc dNdt for extant (non-mutant) types
-
-        # print("\nt", t)
-        # print("N_t", N_t)
-        # print("growth_rate", growth_rate)
-        # print("dNdt", dNdt)
-
-        #------------------------------
+        dNdt = N_t[:num_types] * growth_rate[:num_types]  # only compute dNdt for extant (non-mutant) types
 
         dRdt = ConsumerResourceSystem.resource_change(N_t, R_t, t, traits, consumption_rate, carrying_capacity, energy_passthru,
                                                       influx_rate, decay_rate, cross_production_energy, resource_dynamics_mode, resource_influx_mode, resource_crossfeeding_mode,
@@ -412,22 +380,11 @@ class ConsumerResourceSystem():
 
         self.mutant_fitnesses = growth_rate[-num_mutants:]
 
-        # print("self.mutant_fitnesses", self.mutant_fitnesses, self.mutant_fitnesses.shape)
-        # print("N_t", N_t, N_t.shape)
-        # print("N_t[m]", N_t[mutant_parent_indices], N_t[mutant_parent_indices].shape)
-        # print("mutant_creation_rates", mutant_creation_rates)
-        # print("**", N_t[mutant_parent_indices] * mutant_creation_rates * self.mutant_fitnesses)
-        # try:
+        # TODO: Try to not duplicate mutants in the mutantset for identical types from different lineages (how to assign typeIDs?)
+        # TODO: Change how mutant_creation_rates is calculated, handled, and named
+        # TODO: Consider moving propensities into TypeSet (mutant set in this case) (maybe not because involves N_t and fitnesses which are system variables)
+        # TODO: Change establishment prob term from fitnesses to selcoeffs
         self.mutation_propensities = np.maximum(0, N_t[mutant_parent_indices] * mutant_creation_rates * self.mutant_fitnesses)
-        # except:
-        #     print(f"typeset\n{self.type_set.__dict__}")
-        #     print(f"mutantset\n{self.mutant_set.__dict__}")
-        #     print("self.mutant_fitnesses", self.mutant_fitnesses, self.mutant_fitnesses.shape)
-        #     print("N_t", N_t, N_t.shape)
-        #     print("mutant_parent_indices", mutant_parent_indices)
-        #     print("N_t[m]", N_t[mutant_parent_indices], N_t[mutant_parent_indices].shape)
-        #     print("mutant_creation_rates", mutant_creation_rates)
-        #     print("**", N_t[mutant_parent_indices] * mutant_creation_rates * self.mutant_fitnesses)
 
         dCumPropMut = np.sum(self.mutation_propensities, keepdims=True)
 
@@ -436,38 +393,6 @@ class ConsumerResourceSystem():
         return np.concatenate((dNdt, dRdt, dCumPropMut))
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # @staticmethod
-    # def growth_rate(N, R, t, traits, consumption_rate, carrying_capacity, energy_passthru, growth_factor, energy_costs,
-    #                 influx_rate, decay_rate, energy_content, resource_dynamics_mode, uptake_coeffs=None, consumption_coeffs=None):
-    #     # TODO: Allow for calculating for single N/R or time series of N/Rs
-    #     consumption_rates_bytrait = None
-    #     if(uptake_coeffs is None):
-    #         consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
-    #         uptake_coeffs = consumption_rates_bytrait
-    #         if(resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
-    #             if(np.any(energy_passthru != 0)):
-    #                 uptake_coeffs = uptake_coeffs * (1 - energy_passthru)
-    #             if(np.any(energy_content != 1)):
-    #                 uptake_coeffs = uptake_coeffs * energy_content
-    #     #------------------------------
-    #     if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
-    #         if(consumption_rates_bytrait is None):
-    #             consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
-    #         consumption_coeffs = consumption_rates_bytrait / carrying_capacity if consumption_coeffs is None else consumption_coeffs
-    #         _influx_rate = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
-    #         # -------------------
-    #         resource_uptake = _influx_rate / (decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))
-    #         energy_uptake = np.einsum('ij,j->i', uptake_coeffs, resource_uptake)
-    #         energy_surplus = energy_uptake - energy_costs
-    #         growth_rate = growth_factor * energy_surplus
-    #     #------------------------------
-    #     elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
-    #         energy_uptake = np.einsum('ij,j->i', uptake_coeffs, R)
-    #         energy_surplus = energy_uptake - energy_costs
-    #         growth_rate = growth_factor * energy_surplus
-    #     #------------------------------
-    #     return growth_rate
 
     @staticmethod
     # TODO: Allow for calculating for single N/R or time series of N/Rs
@@ -505,9 +430,9 @@ class ConsumerResourceSystem():
         if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
             if(consumption_rates_bytrait is None):
                 consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
-            consumption_coeffs   = consumption_rates_bytrait / carrying_capacity if consumption_coeffs is None else consumption_coeffs
-            resource_influx_rate = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
-            resource_uptake      = resource_influx_rate / (decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))
+            consumption_coeffs = consumption_rates_bytrait / carrying_capacity if consumption_coeffs is None else consumption_coeffs
+            _influx_rate    = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
+            resource_uptake = _influx_rate / (decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))
             energy_uptake = np.einsum('ij,j->i', uptake_coeffs, resource_uptake)
         elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
             energy_uptake = np.einsum('ij,j->i', uptake_coeffs, R)
@@ -516,26 +441,141 @@ class ConsumerResourceSystem():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # def get_fitness(self, t=None, t_index=None, N=None, R=None, return_mutants=False):
-    #     t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
-    #     #----------------------------------
-    #     if(return_mutants):
-    #         _N = np.zeros(self.type_set.num_types+self.mutant_set.num_types)
-    #         _N[:self.type_set.num_types] = self.N_series[:, t_idx] if N is None else N[:self.type_set.num_types]
-    #         _R = self.R_series[:, t_idx] if R is None else R
-    #         params = self.get_dynamics_params()
-    #         #--------------------------
-    #         # These params indices should be right, but could be off
-    #         return self.growth_rate(N=_N, R=_R, t=self.t_series[t_idx], traits=params[2], consumption_rate=params[3], carrying_capacity=params[4], energy_passthru=params[6], growth_factor=params[7],
-    #                                 influx_rate=params[14], decay_rate=params[15], energy_content=params[16], cross_production_energy=params[20],
-    #                                 energy_costs=params[12], resource_dynamics_mode=params[24], resource_influx_mode=params[25], resource_crossfeeding_mode=params[26])
-    #     else:
-    #         _N = self.N_series[:, t_idx] if N is None else N[:self.type_set.num_types]
-    #         _R = self.R_series[:, t_idx] if R is None else R
-    #         #--------------------------
-    #         return self.growth_rate(N=_N, R=_R, t=self.t_series[t_idx], traits=self.type_set.traits, consumption_rate=self.type_set.consumption_rate, carrying_capacity=self.type_set.carrying_capacity, energy_passthru=self.type_set.energy_passthru, growth_factor=self.type_set.growth_factor,
-    #                                 influx_rate=self.resource_set.influx_rate, decay_rate=self.resource_set.decay_rate, energy_content=self.resource_set.energy_content, cross_production_energy=self.resource_set.cross_production_energy,
-    #                                 energy_costs=self.type_set.energy_costs,  resource_dynamics_mode=self.resource_dynamics_mode, resource_influx_mode=self.resource_set.resource_influx_mode, resource_crossfeeding_mode=self.resource_crossfeeding_mode)
+    @staticmethod
+    def resource_change(N, R, t, traits, consumption_rate, carrying_capacity, energy_passthru,
+                        influx_rate, decay_rate, cross_production_energy, resource_dynamics_mode, resource_influx_mode, resource_crossfeeding_mode,
+                        consumption_coeffs=None):
+        if(consumption_coeffs is None):
+            consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
+            consumption_coeffs = consumption_rates_bytrait / carrying_capacity
+        _influx_rate = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
+        #------------------------------
+        dRdt = None
+        if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+            dRdt = np.zeros(len(R))
+        elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
+            if(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_NONE):
+                resource_consumption_rate = np.einsum('ij,j->j', np.einsum('ij,i->ij', consumption_coeffs, N), R)
+                dRdt = _influx_rate - decay_rate * R - resource_consumption_rate
+            elif(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HOMOTYPES):
+                resource_consumption_rate = np.einsum('ij,j->j', np.einsum('ij,i->ij', consumption_coeffs, N), R)  # shape = (num_resources,)
+                resource_leak_rate = energy_passthru * resource_consumption_rate
+                resource_conversion_rate = np.einsum('ij,j->i', cross_production_energy, resource_leak_rate)
+                dRdt = _influx_rate - decay_rate * R - resource_consumption_rate + resource_conversion_rate
+            elif(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HETEROTYPES):
+                resource_consumption_terms = np.einsum('ij,j->ij', np.einsum('ij,i->ij', consumption_coeffs, N), R)  # gives shape = (num_types, num_resources)
+                resource_consumption_rate = np.sum(resource_consumption_terms, axis=0)  # gives shape = (num_resources,)
+                resource_leak_rate = np.einsum('ij,ij->j', energy_passthru, resource_consumption_terms)  # gives shape = (num_resources,)
+                resource_conversion_rate = np.einsum('ij,j->i', cross_production_energy, resource_leak_rate)
+                dRdt = _influx_rate - decay_rate * R - resource_consumption_rate + resource_conversion_rate
+        #------------------------------
+        return dRdt
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def event_mutant_establishment(self, t, variables, *args):
+        cumulative_mutation_propensity = variables[-1]
+        return self.threshold_mutation_propensity - cumulative_mutation_propensity
+    #----------------------------------
+    event_mutant_establishment.direction = -1
+    event_mutant_establishment.terminal = True
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def handle_mutant_establishment(self):
+        # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
+        mutant_indices = self.type_set.get_mutant_indices(self._active_type_indices)
+        mutant_drawprobs = self.mutation_propensities / np.sum(self.mutation_propensities)
+        mutant_idx = np.random.choice(mutant_indices, p=mutant_drawprobs)
+        # Retrieve the mutant and some of its properties:
+        mutant = self.mutant_set.get_type(mutant_idx)
+        mutant_type_id = mutant.typeIDs[0]
+        mutant_fitness = self.mutant_fitnesses[np.argmax(mutant_indices == mutant_idx)]
+        mutant_abundance = np.maximum(1 / mutant_fitness, 1)
+        #----------------------------------
+        # Get the index of the parent of the selected mutant:
+        parent_idx = mutant.parent_indices[0]
+        #----------------------------------
+        if(self.convergent_lineages and mutant_type_id in self.type_set.typeIDs):
+            # This "mutant" is a pre-existing type in the population; get its index:
+            preexisting_type_idx = np.where(np.array(self.type_set.typeIDs) == mutant_type_id)[0][0]
+            # Add abundance equal to the mutant's establishment abundance to the pre-existing type:
+            self.set_type_abundance(type_index=preexisting_type_idx, abundance=self.get_type_abundance(preexisting_type_idx) + mutant_abundance)
+            # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
+            self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
+        else:
+            # Add the mutant to the population at an establishment abundance equal to 1/dfitness:
+            self.add_type(mutant, abundance=mutant_abundance, parent_index=parent_idx)
+            # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
+            self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
+        #----------------------------------
+        return
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def event_low_abundance(self, t, variables, *args):
+        num_types = args[0]
+        N_t = variables[:num_types]
+        #------------------------------
+        abundances_abs = N_t[N_t > 0]
+        return -1 if np.any(
+            abundances_abs < self.threshold_min_abs_abundance) else 1  # this line sometimes leads to "ValueError: f(a) and f(b) must have different signs"
+        # return (np.min(abundances_abs - self.threshold_min_abs_abundance)) # this line -alos- sometimes leads to "ValueError: f(a) and f(b) must have different signs"
+    #------------------------------
+    event_low_abundance.direction = -1
+    event_low_abundance.terminal = True
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def handle_low_abundance(self):
+        N = self.N
+        #----------------------------------
+        lost_types = np.where((N != 0) & (N <= self.threshold_min_abs_abundance))[0]
+        for i in lost_types:
+            self.set_type_abundance(type_index=i, abundance=0.0)  # Set the abundance of lost types to 0 (but do not remove from system/type set data)
+        #----------------------------------
+        return
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_dynamics_params(self, type_index=None):
+        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.num_types)
+        #----------------------------------
+        type_params = self.type_set.get_dynamics_params(type_idx)
+        mutant_params = self.mutant_set.get_dynamics_params(self.type_set.get_mutant_indices(type_idx))
+        resource_params = self.resource_set.get_dynamics_params()
+        # Map parent indices (relative to all types) to the indices of [active indices] given by type_index:
+        mutant_parent_relindices = np.searchsorted(type_idx, mutant_params['parent_indices'])
+        #----------------------------------
+        type_params_wmuts = { 'num_types': type_params['num_types'],
+                              'num_mutants': mutant_params['num_types'],
+                              'traits': np.concatenate([type_params['traits'], mutant_params['traits']]),
+                              'consumption_rate': type_params['consumption_rate'] if type_params['consumption_rate'].ndim < 2 else np.concatenate([type_params['consumption_rate'], mutant_params['consumption_rate']]),
+                              'carrying_capacity': type_params['carrying_capacity'] if type_params['carrying_capacity'].ndim < 2 else np.concatenate([type_params['carrying_capacity'], mutant_params['carrying_capacity']]),
+                              'energy_passthru': type_params['energy_passthru'] if type_params['energy_passthru'].ndim < 2 else np.concatenate([type_params['energy_passthru'], mutant_params['energy_passthru']]),
+                              'growth_factor': type_params['growth_factor'] if type_params['growth_factor'].ndim < 2 else np.concatenate([type_params['growth_factor'], mutant_params['growth_factor']]),
+                              'energy_costs': np.concatenate([type_params['energy_costs'], mutant_params['energy_costs']]),
+                              # 'mutation_rate': type_params['mutation_rate'] if type_params['mutation_rate'].ndim < 2 else np.concatenate([type_params['mutation_rate'], mutant_params['mutation_rate']]),
+                              'mutant_creation_rates': mutant_params['creation_rates'],
+                              'mutant_parent_indices': mutant_parent_relindices }
+        #----------------------------------
+        consumption_rates_bytrait = np.einsum('ij,ij->ij', type_params_wmuts['traits'], type_params_wmuts['consumption_rate']) if type_params_wmuts['consumption_rate'].ndim == 2 else np.einsum('ij,j->ij', type_params_wmuts['traits'], type_params_wmuts['consumption_rate'])
+        # ------------------
+        uptake_coeffs = consumption_rates_bytrait
+        if(self.resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+            if(np.any(type_params_wmuts['energy_passthru'] != 0)):
+                uptake_coeffs = uptake_coeffs * (1 - type_params_wmuts['energy_passthru'])
+            if(np.any(resource_params['energy_content'] != 1)):
+                uptake_coeffs = uptake_coeffs * resource_params['energy_content']
+        # ------------------
+        consumption_coeffs = consumption_rates_bytrait / type_params_wmuts['carrying_capacity']
+        #----------------------------------
+        return (tuple(type_params_wmuts.values())
+                + tuple(resource_params.values())
+                + (uptake_coeffs, consumption_coeffs)
+                + (self.resource_dynamics_mode, self.resource_set.resource_influx_mode, self.resource_crossfeeding_mode))
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_fitness(self, t=None, t_index=None, N=None, R=None, return_mutants=False):
         t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
@@ -580,222 +620,6 @@ class ConsumerResourceSystem():
             # --------------------------
             return self.energy_uptake(N=_N, R=_R, t=self.t_series[t_idx], traits=self.type_set.traits, consumption_rate=self.type_set.consumption_rate, carrying_capacity=self.type_set.carrying_capacity, energy_passthru=self.type_set.energy_passthru,
                                       influx_rate=self.resource_set.influx_rate, decay_rate=self.resource_set.decay_rate, energy_content=self.resource_set.energy_content, resource_dynamics_mode=self.resource_dynamics_mode, resource_influx_mode=self.resource_set.resource_influx_mode)
-
-            #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # def get_dynamics_params(self, type_indices=None):
-    #     type_indices    = list(range(self.type_set.num_types)) if type_indices is None else type_indices
-    #     #----------------------------------
-    #     type_params     = self.type_set.get_dynamics_params(type_indices)
-    #     mutant_params   = self.mutant_set.get_dynamics_params(self.type_set.get_mutant_indices(type_indices))
-    #     resource_params = self.resource_set.get_dynamics_params()
-    #     #----------------------------------
-    #     type_params_wmuts = {
-    #                           'num_types':    type_params['num_types'], 
-    #                           'num_mutants':  mutant_params['num_types'],
-    #                           'traits':        np.concatenate([type_params['traits'], mutant_params['traits']]),
-    #                           'consumption_rate':         type_params['consumption_rate'] if type_params['consumption_rate'].ndim < 2 else np.concatenate([type_params['consumption_rate'], mutant_params['consumption_rate']]),
-    #                           'carrying_capacity':        type_params['carrying_capacity'] if type_params['carrying_capacity'].ndim < 2 else np.concatenate([type_params['carrying_capacity'], mutant_params['carrying_capacity']]),
-    #                           'energy_passthru':        type_params['energy_passthru'] if type_params['energy_passthru'].ndim < 2 else np.concatenate([type_params['energy_passthru'], mutant_params['energy_passthru']]),
-    #                           'growth_factor':        type_params['growth_factor'] if type_params['growth_factor'].ndim < 2 else np.concatenate([type_params['growth_factor'], mutant_params['growth_factor']]),
-    #                           'cost_baseline':           type_params['cost_baseline'] if type_params['cost_baseline'].ndim < 2 else np.concatenate([type_params['cost_baseline'], mutant_params['cost_baseline']]),
-    #                           'cost_trait':          type_params['cost_trait'] if type_params['cost_trait'].ndim < 2 else np.concatenate([type_params['cost_trait'], mutant_params['cost_trait']]),
-    #                           'cost_interaction':            type_params['cost_interaction'],
-    #                           'mutation_rate':           type_params['mutation_rate'] if type_params['mutation_rate'].ndim < 2 else np.concatenate([type_params['mutation_rate'], mutant_params['mutation_rate']]),
-    #                           'energy_costs': np.concatenate([type_params['energy_costs'], mutant_params['energy_costs']]) 
-    #                         }
-    #     #----------------------------------
-    #     consumption_rates_bytrait = np.einsum('ij,ij->ij', type_params_wmuts['traits'], type_params_wmuts['consumption_rate']) if type_params_wmuts['consumption_rate'].ndim == 2 else np.einsum('ij,j->ij', type_params_wmuts['traits'], type_params_wmuts['consumption_rate'])
-    #     #------------------
-    #     uptake_coeffs = consumption_rates_bytrait
-    #     if(self.resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
-    #         if(np.any(type_params_wmuts['energy_passthru'] != 0)):
-    #             uptake_coeffs = uptake_coeffs * (1 - type_params_wmuts['energy_passthru'])
-    #         if(np.any(resource_params['energy_content'] != 1)):
-    #             uptake_coeffs = uptake_coeffs * resource_params['energy_content']
-    #     #------------------
-    #     consumption_coeffs  = consumption_rates_bytrait/type_params_wmuts['carrying_capacity']
-    #     #------------------
-    #     resource_decay_rate = (1/resource_params['decay_rate']).ravel()
-    #     #----------------------------------
-    #     return (tuple(type_params_wmuts.values()) 
-    #             + tuple(resource_params.values())
-    #             + (uptake_coeffs, consumption_coeffs, resource_decay_rate)
-    #             + (self.resource_dynamics_mode, self.resource_set.resource_influx_mode, self.resource_crossfeeding_mode))
-
-    def get_dynamics_params(self, type_index=None):
-        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.num_types)
-        #----------------------------------
-        type_params = self.type_set.get_dynamics_params(type_idx)
-        mutant_params = self.mutant_set.get_dynamics_params(self.type_set.get_mutant_indices(type_idx))
-        resource_params = self.resource_set.get_dynamics_params()
-        # Map parent indices (relative to all types) to the indices of [active indices] given by type_index:
-        mutant_parent_relindices = np.searchsorted(type_idx, mutant_params['parent_indices'])
-        #----------------------------------
-        type_params_wmuts = { 'num_types': type_params['num_types'],
-                              'num_mutants': mutant_params['num_types'],
-                              'traits': np.concatenate([type_params['traits'], mutant_params['traits']]),
-                              'consumption_rate': type_params['consumption_rate'] if type_params['consumption_rate'].ndim < 2 else np.concatenate([type_params['consumption_rate'], mutant_params['consumption_rate']]),
-                              'carrying_capacity': type_params['carrying_capacity'] if type_params['carrying_capacity'].ndim < 2 else np.concatenate([type_params['carrying_capacity'], mutant_params['carrying_capacity']]),
-                              'energy_passthru': type_params['energy_passthru'] if type_params['energy_passthru'].ndim < 2 else np.concatenate([type_params['energy_passthru'], mutant_params['energy_passthru']]),
-                              'growth_factor': type_params['growth_factor'] if type_params['growth_factor'].ndim < 2 else np.concatenate([type_params['growth_factor'], mutant_params['growth_factor']]),
-                              'energy_costs': np.concatenate([type_params['energy_costs'], mutant_params['energy_costs']]),
-                              # 'mutation_rate': type_params['mutation_rate'] if type_params['mutation_rate'].ndim < 2 else np.concatenate([type_params['mutation_rate'], mutant_params['mutation_rate']]),
-                              'mutant_creation_rates': mutant_params['creation_rates'],
-                              'mutant_parent_indices': mutant_parent_relindices }
-        #----------------------------------
-        consumption_rates_bytrait = np.einsum('ij,ij->ij', type_params_wmuts['traits'], type_params_wmuts['consumption_rate']) if type_params_wmuts['consumption_rate'].ndim == 2 else np.einsum('ij,j->ij', type_params_wmuts['traits'], type_params_wmuts['consumption_rate'])
-        # ------------------
-        uptake_coeffs = consumption_rates_bytrait
-        if(self.resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
-            if(np.any(type_params_wmuts['energy_passthru'] != 0)):
-                uptake_coeffs = uptake_coeffs * (1 - type_params_wmuts['energy_passthru'])
-            if(np.any(resource_params['energy_content'] != 1)):
-                uptake_coeffs = uptake_coeffs * resource_params['energy_content']
-        # ------------------
-        consumption_coeffs = consumption_rates_bytrait / type_params_wmuts['carrying_capacity']
-        #----------------------------------
-        return (tuple(type_params_wmuts.values())
-                + tuple(resource_params.values())
-                + (uptake_coeffs, consumption_coeffs)
-                + (self.resource_dynamics_mode, self.resource_set.resource_influx_mode, self.resource_crossfeeding_mode))
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @staticmethod
-    def resource_change(N, R, t, traits, consumption_rate, carrying_capacity, energy_passthru,
-                        influx_rate, decay_rate, cross_production_energy,
-                        resource_dynamics_mode, resource_influx_mode, resource_crossfeeding_mode,
-                        consumption_coeffs=None):
-        if(consumption_coeffs is None):
-            consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
-            consumption_coeffs = consumption_rates_bytrait / carrying_capacity
-        _influx_rate = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
-        #------------------------------
-        dRdt = None
-        if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
-            dRdt = np.zeros(len(R))
-        elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
-            if(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_NONE):
-                resource_consumption_rate = np.einsum('ij,j->j', np.einsum('ij,i->ij', consumption_coeffs, N), R)
-                dRdt = _influx_rate - decay_rate * R - resource_consumption_rate
-            elif(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HOMOTYPES):
-                resource_consumption_rate = np.einsum('ij,j->j', np.einsum('ij,i->ij', consumption_coeffs, N), R)  # shape = (num_resources,)
-                resource_leak_rate = energy_passthru * resource_consumption_rate
-                resource_conversion_rate = np.einsum('ij,j->i', cross_production_energy, resource_leak_rate)
-                dRdt = _influx_rate - decay_rate * R - resource_consumption_rate + resource_conversion_rate
-            elif(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HETEROTYPES):
-                resource_consumption_terms = np.einsum('ij,j->ij', np.einsum('ij,i->ij', consumption_coeffs, N), R)  # gives shape = (num_types, num_resources)
-                resource_consumption_rate = np.sum(resource_consumption_terms, axis=0)  # gives shape = (num_resources,)
-                resource_leak_rate = np.einsum('ij,ij->j', energy_passthru, resource_consumption_terms)  # gives shape = (num_resources,)
-                resource_conversion_rate = np.einsum('ij,j->i', cross_production_energy, resource_leak_rate)
-                dRdt = _influx_rate - decay_rate * R - resource_consumption_rate + resource_conversion_rate
-        #------------------------------
-        return dRdt
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @staticmethod
-    def resource_demand(N, traits):
-        return np.einsum(('ij,ij->j' if N.ndim == 2 else 'i,ij->j'), N, traits)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def event_mutation(self, t, variables, *args):
-        cumulative_mutation_propensity = variables[-1]
-        return self.threshold_mutation_propensity - cumulative_mutation_propensity
-    #----------------------------------
-    event_mutation.direction = -1
-    event_mutation.terminal = True
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def event_low_abundance(self, t, variables, *args):
-        num_types = args[0]
-        N_t = variables[:num_types]
-        #------------------------------
-        abundances_abs = N_t[N_t > 0]
-        return -1 if np.any(
-            abundances_abs < self.threshold_min_abs_abundance) else 1  # this line sometimes leads to "ValueError: f(a) and f(b) must have different signs"
-        # return (np.min(abundances_abs - self.threshold_min_abs_abundance)) # this line -alos- sometimes leads to "ValueError: f(a) and f(b) must have different signs"
-
-    #------------------------------
-    event_low_abundance.direction = -1
-    event_low_abundance.terminal = True
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # /!\ deprecated
-    # def handle_mutation_event(self):
-    #     # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
-    #     mutant_indices   = self.type_set.get_mutant_indices(self._active_type_indices)
-    #     mutant_drawprobs = self.mutation_propensities/np.sum(self.mutation_propensities)
-    #     mutant_idx       = np.random.choice(mutant_indices, p=mutant_drawprobs)
-    #     # Retrieve the mutant and some of its properties:
-    #     mutant           = self.mutant_set.get_type(mutant_idx) # print("mutant.cost_baseline", mutant.cost_baseline)
-    #     mutant_type_id   = mutant.typeIDs[0]
-    #     mutant_fitness   = self.mutant_fitnesses[np.argmax(mutant_indices == mutant_idx)]
-    #     mutant_abundance = np.maximum(1/mutant_fitness, 1) # forcing abundance of new types to be at least 1, this is a Ryan addition (perhaps controversial)
-    #     #----------------------------------
-    #     # Get the index of the parent of the selected mutant:
-    #     parent_idx       = mutant_idx // self.type_set.num_traits
-    #     #----------------------------------
-    #     if(self.convergent_lineages and mutant_type_id in self.type_set.typeIDs):
-    #         # This "mutant" is a pre-existing type in the population; get its index:
-    #         preexisting_type_idx = np.where(np.array(self.type_set.typeIDs) == mutant_type_id)[0][0]
-    #         # Add abundance equal to the mutant's establishment abundance to the pre-existing type:
-    #         self.set_type_abundance(type_index=preexisting_type_idx, abundance=self.get_type_abundance(preexisting_type_idx)+mutant_abundance)
-    #         # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
-    #         self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx)-mutant_abundance, 1))
-    #     else:
-    #         # Add the mutant to the population at an establishment abundance equal to 1/dfitness:
-    #         self.add_type(mutant, abundance=mutant_abundance, parent_index=parent_idx)
-    #         # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
-    #         self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx)-mutant_abundance, 1))
-    #     #----------------------------------
-    #     return
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def handle_type_loss(self):
-        N = self.N
-        #----------------------------------
-        lost_types = np.where((N != 0) & (N <= self.threshold_min_abs_abundance))[0]
-        for i in lost_types:
-            self.set_type_abundance(type_index=i, abundance=0.0)  # Set the abundance of lost types to 0 (but do not remove from system/type set data)
-        #----------------------------------
-        return
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def handle_mutation_event(self):
-        # Pick the mutant that will be established with proababilities proportional to mutants' propensities for establishment:
-        mutant_indices = self.type_set.get_mutant_indices(self._active_type_indices)
-        mutant_drawprobs = self.mutation_propensities / np.sum(self.mutation_propensities)
-        mutant_idx = np.random.choice(mutant_indices, p=mutant_drawprobs)
-        # Retrieve the mutant and some of its properties:
-        mutant = self.mutant_set.get_type(mutant_idx)
-        mutant_type_id = mutant.typeIDs[0]
-        mutant_fitness = self.mutant_fitnesses[np.argmax(mutant_indices == mutant_idx)]
-        mutant_abundance = np.maximum(1 / mutant_fitness, 1)
-        #----------------------------------
-        # Get the index of the parent of the selected mutant:
-        parent_idx = mutant.parent_indices[0]
-        #----------------------------------
-        if(self.convergent_lineages and mutant_type_id in self.type_set.typeIDs):
-            # This "mutant" is a pre-existing type in the population; get its index:
-            preexisting_type_idx = np.where(np.array(self.type_set.typeIDs) == mutant_type_id)[0][0]
-            # Add abundance equal to the mutant's establishment abundance to the pre-existing type:
-            self.set_type_abundance(type_index=preexisting_type_idx, abundance=self.get_type_abundance(preexisting_type_idx) + mutant_abundance)
-            # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
-            self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
-        else:
-            # Add the mutant to the population at an establishment abundance equal to 1/dfitness:
-            self.add_type(mutant, abundance=mutant_abundance, parent_index=parent_idx)
-            # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
-            self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
-        #----------------------------------
-        return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -955,6 +779,12 @@ class ConsumerResourceSystem():
         cost_cutoff = np.max(self.type_set.energy_costs) if cost_cutoff is None else cost_cutoff
         #----------------------------------
         return self.type_set.get_type(self.type_set.energy_costs[self.type_set.energy_costs <= cost_cutoff].argsort()[:rank_cutoff])
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @staticmethod
+    def resource_demand(N, traits):
+        return np.einsum(('ij,ij->j' if N.ndim == 2 else 'i,ij->j'), N, traits)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
