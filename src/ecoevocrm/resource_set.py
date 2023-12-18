@@ -105,7 +105,7 @@ class ResourceSet():
                     'influx_rate':           self._influx_rate[resource_idx],
                     'decay_rate':           self.decay_rate[resource_idx],
                     'energy_content':         self.energy_content[resource_idx],
-                    'cross_production_energy':             self.cross_production_energy[resource_idx,:]}
+                    'cross_production_energy':             self.cross_production_energy[resource_idx, :]}
             # return (1, self._influx_rate[resource_idx], self.decay_rate[resource_idx], self.energy_content[resource_idx], self.cross_production[resource_idx, :])
         
 

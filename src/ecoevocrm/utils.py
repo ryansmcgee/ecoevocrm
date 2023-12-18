@@ -37,7 +37,7 @@ class ExpandableArray():
 
     def expand_alloc(self, new_alloc):
         if(new_alloc[0] < self._alloc[0] or new_alloc[1] < self._alloc[1]):
-            utils.error("Error in ExpandableArray.expand_alloc(): new_alloc shape must be at least as large as current alloc shape in each dimension.")
+            error("Error in ExpandableArray.expand_alloc(): new_alloc shape must be at least as large as current alloc shape in each dimension.")
         self._alloc = new_alloc
         exp_arr = np.empty(shape=self._alloc, dtype=self.dtype)
         exp_arr[:self._shape[0], :self._shape[1]] = self.values
@@ -208,8 +208,6 @@ def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
         # Check if array was able to be reshaped to system dimensions:
         if(arr.shape != target_shape):
            if(shape is None):
-                error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the system dimensionality ({self.num_types} types, {self.num_resources} resources).")
-           else:
                 error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the target dimensionality {target_shape}.")
         return  arr
 

@@ -21,10 +21,8 @@ class TypeSet():
                        creation_rates       = None,
                        lineageIDs           = None,
                        parent_indices       = None,
-                       normalize_phenotypes = False,
                        binarize_trait_costs = True,
-                       binarize_interaction_costs = True
-                    ):
+                       binarize_interaction_costs = True ):
 
         #----------------------------------
         # Determine the number of types and traits,
@@ -394,6 +392,7 @@ class TypeSet():
         parent_idx   = np.where(self.typeIDs==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
+        added_type_set = None
         if(type_set is not None):
             if(isinstance(type_set, TypeSet)):
                 added_type_set = type_set
@@ -409,8 +408,7 @@ class TypeSet():
                                          cost_trait=cost_trait if cost_trait is not None else self.cost_trait[ref_type_idx],
                                          mutation_rate=mutation_rate if mutation_rate is not None else self.mutation_rate[ref_type_idx],
                                          # mean_cost_baseline_mut=mean_cost_baseline_mut if mean_cost_baseline_mut is not None else self._mean_cost_baseline_mut
-                                         creation_rates=creation_rates if creation_rates is not None else self.creation_rates[ref_type_idx]
-                                         )
+                                         creation_rates=creation_rates if creation_rates is not None else self.creation_rates[ref_type_idx])
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != added_type_set.num_traits): 
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({added_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
@@ -457,7 +455,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type_to_phylogeny(self, type_index=None, type_id=None, parent_index=None, parent_id=None):
+    def add_type_to_phylogeny(self, type_index=None, type_id=None, parent_id=None):
         type_idx   = np.where(np.in1d(self.typeIDs, utils.treat_as_list(type_id))) if type_id is not None else type_index
         parent_idx = np.where(self.typeIDs==parent_id)[0] if parent_id is not None else self.parent_indices[type_idx]
         #----------------------------------
@@ -508,7 +506,7 @@ class TypeSet():
     def assign_type_ids(self, type_index=None, traits=None):
         # print("assignID >>", "type_index=", type_index, "traits=", traits)
         traits = traits if traits is not None else self.traits
-        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(traits.shape[0])
+        # type_idx = utils.treat_as_list(type_index) if type_index is not None else range(traits.shape[0])
         # Convert binary traits arrays to integer IDs
         typeIDs = []
         for u in range(len(traits)):
@@ -624,7 +622,7 @@ class TypeSet():
         #----------------------------------
         # Parent indices require special handling because simply reordering the parent indices list makes the index pointers point to incorrect places relative to the reordered lists
         _parent_indices_tempreorder = np.array(self._parent_indices)[type_order].tolist()
-        self._parent_indices = [np.where(type_order == pidx)[0][0] if pidx != None else None for pidx in _parent_indices_tempreorder]
+        self._parent_indices = [np.where(type_order == pidx)[0][0] if pidx is not None else None for pidx in _parent_indices_tempreorder]
         #----------------------------------
         return
 
@@ -645,8 +643,6 @@ class TypeSet():
 
     def get_phenotype_strings(self):
         return [ ''.join(['1' if traits_vector[i] != 0 else '0' for i in range(len(traits_vector))]) for traits_vector in self.traits ]
-
-
 
 
 
