@@ -9,82 +9,79 @@ class TypeSet():
 
     def __init__(self, num_types   = None,
                        num_traits  = None,
-                       sigma       = None,
-                       beta        = 1,
-                       kappa       = 1e10,
-                       eta         = 1,
-                       lamda       = 0,
-                       growthfactor       = 1,
-                       xi          = 0,
-                       chi         = None,
-                       J           = None,
-                       mu          = 1e-10, 
-                       generation_rates = None,
+                       traits       = None,
+                       consumption_rate        = 1,
+                       carrying_capacity       = 1e10,
+                       growth_factor= 1,
+                       energy_passthru       = 0,
+                       cost_baseline          = 0,
+                       cost_trait         = None,
+                       cost_interaction           = None,
+                       mutation_rate          = 1e-10,
+                       creation_rates = None,
                        lineageIDs  = None,
                        parent_indices = None,
                        normalize_phenotypes = False,
-                       binarize_traits_chi_cost_terms = False,
-                       binarize_traits_J_cost_terms = False
+                       binarize_trait_costs = True,
+                       binarize_interaction_costs = True
                     ):
 
         #----------------------------------
         # Determine the number of types and traits,
-        # and initialize sigma matrix:
+        # and initialize traits matrix:
         #----------------------------------
-        if(isinstance(sigma, (list, np.ndarray))):
-            sigma = np.array(sigma)
-            if(sigma.ndim == 2):
-                num_types  = sigma.shape[0]
-                num_traits = sigma.shape[1]
-            elif(sigma.ndim == 1):
+        if(isinstance(traits, (list, np.ndarray))):
+            traits = np.array(traits)
+            if(traits.ndim == 2):
+                num_types  = traits.shape[0]
+                num_traits = traits.shape[1]
+            elif(traits.ndim == 1):
                 num_types  = 1
-                num_traits = len(sigma)
+                num_traits = len(traits)
         elif(num_types is not None and num_traits is not None):
             num_types  = num_types
             num_traits = num_traits
         else:
-            utils.error("Error in TypeSet __init__(): Number of types and traits must be specified by providing a) a sigma matrix, or b) both num_types and num_traits values.")
+            utils.error("Error in TypeSet __init__(): Number of types and traits must be specified by providing a) a traits matrix, or b) both num_types and num_traits values.")
         #----------------------------------
         
         self.num_traits = num_traits
 
-        # /!\ Non-binary sigmas is deprecated as of 2023-09-01
+        # /!\ Non-binary traitss is deprecated as of 2023-09-01
         # self.normalize_phenotypes = normalize_phenotypes
         # if(self.normalize_phenotypes):
-        #     norm_denom = np.atleast_2d(sigma).sum(axis=1, keepdims=1)
+        #     norm_denom = np.atleast_2d(traits).sum(axis=1, keepdims=1)
         #     norm_denom[norm_denom == 0] = 1
-        #     sigma = sigma/norm_denom
+        #     traits = traits/norm_denom
 
-        self._sigma = utils.ExpandableArray(utils.reshape(sigma, shape=(num_types, num_traits)), dtype='int')
+        self._traits = utils.ExpandableArray(utils.reshape(traits, shape=(num_types, num_traits)), dtype='int')
 
         #----------------------------------
         # Initialize parameter vectors/matrices:
         #----------------------------------
 
         # print("Start!")
-        # print("_beta ...")
-        self._beta   = self.preprocess_params(beta,  has_trait_dim=True)
-        # print("_kappa ...")
-        self._kappa  = self.preprocess_params(kappa, has_trait_dim=True)
-        # print("_eta ...")
-        self._eta    = self.preprocess_params(eta,   has_trait_dim=True)
-        # print("_lamda ...")
-        self._lamda  = self.preprocess_params(lamda, has_trait_dim=True)
-        # print("_growthfactor ...")
-        self._growthfactor  = self.preprocess_params(growthfactor, has_trait_dim=False)
-        # print("_xi ...")
-        self._xi     = self.preprocess_params(xi,    has_trait_dim=False) #, force_expandable_array=(mean_xi_mut > 0))
-        # print("_chi ...")
-        self._chi    = self.preprocess_params(chi,   has_trait_dim=True) if chi is not None else None
-        # print("_J ...")
-        self._J      = utils.reshape(J, shape=(self.num_traits, self.num_traits)) if J is not None else None
-        # print("_mu ...")
-        self._mu     = self.preprocess_params(mu,    has_trait_dim=True)
-        # print("_generation_rates ...")
-        self._generation_rates = self.preprocess_params(generation_rates, has_trait_dim=False) if generation_rates is not None else None
+        # print("_consumption_rate ...")
+        self._consumption_rate   = self.preprocess_params(consumption_rate,  has_trait_dim=True)
+        # print("_carrying_capacity ...")
+        self._carrying_capacity  = self.preprocess_params(carrying_capacity, has_trait_dim=True)
+        # print("_energy_passthru ...")
+        self._energy_passthru  = self.preprocess_params(energy_passthru, has_trait_dim=True)
+        # print("_growth_factor ...")
+        self._growth_factor  = self.preprocess_params(growth_factor, has_trait_dim=False)
+        # print("_cost_baseline ...")
+        self._cost_baseline     = self.preprocess_params(cost_baseline,    has_trait_dim=False) #, force_expandable_array=(mean_cost_baseline_mut > 0))
+        # print("_cost_trait ...")
+        self._cost_trait    = self.preprocess_params(cost_trait,   has_trait_dim=True) if cost_trait is not None else None
+        # print("_cost_interaction ...")
+        self._cost_interaction      = utils.reshape(cost_interaction, shape=(self.num_traits, self.num_traits)) if cost_interaction is not None else None
+        # print("_mutation_rate ...")
+        self._mutation_rate     = self.preprocess_params(mutation_rate,    has_trait_dim=True)
+        # print("_creation_rates ...")
+        self._creation_rates = self.preprocess_params(creation_rates, has_trait_dim=False) if creation_rates is not None else None
 
-        # self._mean_xi_mut = mean_xi_mut
-        # self.__mean_xi_mut = self.preprocess_params(__mean_xi_mut, has_trait_dim=False)
+        # self._mean_cost_baseline_mut = mean_cost_baseline_mut
+        # self.__mean_cost_baseline_mut = self.preprocess_params(__mean_cost_baseline_mut, has_trait_dim=False)
 
         #----------------------------------
         # Initialize other type properties/metadata:
@@ -107,8 +104,8 @@ class TypeSet():
         
         self.phylogeny = {}
 
-        self.binarize_traits_chi_cost_terms = binarize_traits_chi_cost_terms
-        self.binarize_traits_J_cost_terms   = binarize_traits_J_cost_terms
+        self.binarize_trait_costs = binarize_trait_costs
+        self.binarize_interaction_costs   = binarize_interaction_costs
                 
     
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -119,120 +116,112 @@ class TypeSet():
 
     @property
     def num_types(self):
-        return self.sigma.shape[0]
+        return self.traits.shape[0]
     
     @property
-    def sigma(self):
-        return TypeSet.get_array(self._sigma)
+    def traits(self):
+        return TypeSet.get_array(self._traits)
 
     @property
-    def beta(self):
-        return TypeSet.get_array(self._beta)
+    def consumption_rate(self):
+        return TypeSet.get_array(self._consumption_rate)
 
-    @beta.setter
-    def beta(self, vals):
-        self._beta = self.preprocess_params(vals, has_trait_dim=True)
-
-    @property
-    def kappa(self):
-        return TypeSet.get_array(self._kappa)
-
-    @kappa.setter
-    def kappa(self, vals):
-        self._kappa = self.preprocess_params(vals, has_trait_dim=True)
+    @consumption_rate.setter
+    def consumption_rate(self, vals):
+        self._consumption_rate = self.preprocess_params(vals, has_trait_dim=True)
 
     @property
-    def eta(self):
-        return TypeSet.get_array(self._eta)
+    def carrying_capacity(self):
+        return TypeSet.get_array(self._carrying_capacity)
 
-    @eta.setter
-    def eta(self, vals):
-        self._eta = self.preprocess_params(vals, has_trait_dim=True)
-
-    @property
-    def lamda(self):
-        return TypeSet.get_array(self._lamda)
-
-    @lamda.setter
-    def lamda(self, vals):
-        self._lamda = self.preprocess_params(vals, has_trait_dim=True)
+    @carrying_capacity.setter
+    def carrying_capacity(self, vals):
+        self._carrying_capacity = self.preprocess_params(vals, has_trait_dim=True)
 
     @property
-    def growthfactor(self):
-        return TypeSet.get_array(self._growthfactor)
+    def energy_passthru(self):
+        return TypeSet.get_array(self._energy_passthru)
 
-    @growthfactor.setter
-    def growthfactor(self, vals):
-        self._growthfactor = self.preprocess_params(vals, has_trait_dim=False)
-
-    @property
-    def xi(self):
-        return TypeSet.get_array(self._xi)
-
-    @xi.setter
-    def xi(self, vals):
-        self._xi = self.preprocess_params(vals, has_trait_dim=False)
+    @energy_passthru.setter
+    def energy_passthru(self, vals):
+        self._energy_passthru = self.preprocess_params(vals, has_trait_dim=True)
 
     @property
-    def chi(self):
-        return TypeSet.get_array(self._chi)
+    def growth_factor(self):
+        return TypeSet.get_array(self._growth_factor)
 
-    @chi.setter
-    def chi(self, vals):
-        self._chi = self.preprocess_params(vals, has_trait_dim=True)
-
-    @property
-    def mu(self):
-        return TypeSet.get_array(self._mu)
-
-    @mu.setter
-    def mu(self, vals):
-        self._mu = self.preprocess_params(vals, has_trait_dim=True)
+    @growth_factor.setter
+    def growth_factor(self, vals):
+        self._growth_factor = self.preprocess_params(vals, has_trait_dim=False)
 
     @property
-    def generation_rates(self):
-        return self._generation_rates
+    def cost_baseline(self):
+        return TypeSet.get_array(self._cost_baseline)
 
-    @generation_rates.setter
-    def generation_rates(self, vals):
-        self._generation_rates = self.preprocess_params(vals, has_trait_dim=False)
+    @cost_baseline.setter
+    def cost_baseline(self, vals):
+        self._cost_baseline = self.preprocess_params(vals, has_trait_dim=False)
+
+    @property
+    def cost_trait(self):
+        return TypeSet.get_array(self._cost_trait)
+
+    @cost_trait.setter
+    def cost_trait(self, vals):
+        self._cost_trait = self.preprocess_params(vals, has_trait_dim=True)
+
+    @property
+    def mutation_rate(self):
+        return TypeSet.get_array(self._mutation_rate)
+
+    @mutation_rate.setter
+    def mutation_rate(self, vals):
+        self._mutation_rate = self.preprocess_params(vals, has_trait_dim=True)
+
+    @property
+    def creation_rates(self):
+        return self._creation_rates
+
+    @creation_rates.setter
+    def creation_rates(self, vals):
+        self._creation_rates = self.preprocess_params(vals, has_trait_dim=False)
 
     # @property
-    # def _mean_xi_mut(self):
-    #     return self.__mean_xi_mut
+    # def _mean_cost_baseline_mut(self):
+    #     return self.__mean_cost_baseline_mut
 
-    # @_mean_xi_mut.setter
-    # def _mean_xi_mut(self, vals):
-    #     self.__mean_xi_mut = self.preprocess_params(vals, has_trait_dim=False)
+    # @_mean_cost_baseline_mut.setter
+    # def _mean_cost_baseline_mut(self, vals):
+    #     self.__mean_cost_baseline_mut = self.preprocess_params(vals, has_trait_dim=False)
 
     @property
-    def J(self):
-        return TypeSet.get_array(self._J)
+    def cost_interaction(self):
+        return TypeSet.get_array(self._cost_interaction)
 
     @property
     def energy_costs(self):
         if(self._energy_costs is None):
-            costs = 0 + (self.xi.ravel() if self.xi.ndim == 2 else self.xi)
-            costs += self.chi_cost_terms
-            costs += self.J_cost_terms
+            costs = 0 + (self.cost_baseline.ravel() if self.cost_baseline.ndim == 2 else self.cost_baseline)
+            costs += self.cost_trait_cost_terms
+            costs += self.cost_interaction_cost_terms
             if(np.any(costs < 0)):
                 raise ValueError('Negative energy_costs encountered for one or more types.')
             self._energy_costs = utils.ExpandableArray(costs)
         return TypeSet.get_array(self._energy_costs).ravel()
 
     @property
-    def xi_cost_terms(self):
-        return (self.xi.ravel() if self.xi.ndim == 2 else self.xi)
+    def cost_baseline_cost_terms(self):
+        return (self.cost_baseline.ravel() if self.cost_baseline.ndim == 2 else self.cost_baseline)
 
     @property
-    def chi_cost_terms(self):
-        _sigma = self.sigma if not self.binarize_traits_chi_cost_terms else (self.sigma > 0).astype(int)
-        return np.sum(_sigma * self.chi, axis=1) if self._chi is not None else 0
+    def cost_trait_cost_terms(self):
+        _traits = self.traits if not self.binarize_trait_costs else (self.traits > 0).astype(int)
+        return np.sum(_traits * self.cost_trait, axis=1) if self._cost_trait is not None else 0
     
     @property
-    def J_cost_terms(self):
-        _sigma = self.sigma if not self.binarize_traits_J_cost_terms else (self.sigma > 0).astype(int)
-        return -1 * np.sum(_sigma * np.dot(_sigma, self.J), axis=1) if self._J is not None else 0
+    def cost_interaction_cost_terms(self):
+        _traits = self.traits if not self.binarize_interaction_costs else (self.traits > 0).astype(int)
+        return -1 * np.sum(_traits * np.dot(_traits, self.cost_interaction), axis=1) if self._cost_interaction is not None else 0
     
     @property
     def typeIDs(self):
@@ -310,44 +299,43 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    # def generate_mutant_phenotypes(self, sigma=None):
-    #     sigma = self.sigma if sigma is None else sigma
-    #     sigma = (sigma != 0).astype(float)
+    # def generate_mutant_phenotypes(self, traits=None):
+    #     traits = self.traits if traits is None else traits
+    #     traits = (traits != 0).astype(float)
     #     #----------------------------------
-    #     mutations = np.tile(np.identity(sigma.shape[1]), reps=(sigma.shape[0], 1))
-    #     sigma_mut = 1 * np.logical_xor( np.repeat(sigma, repeats=sigma.shape[1], axis=0), mutations )
+    #     mutations = np.tile(np.identity(traits.shape[1]), reps=(traits.shape[0], 1))
+    #     traits_mut = 1 * np.logical_xor( np.repeat(traits, repeats=traits.shape[1], axis=0), mutations )
     #     #----------------------------------
-    #     # /!\ Non-binary sigmas is deprecated as of 2023-09-01
+    #     # /!\ Non-binary traitss is deprecated as of 2023-09-01
     #     # if(self.normalize_phenotypes):
-    #     #     norm_denom = sigma_mut.sum(axis=1, keepdims=1)
+    #     #     norm_denom = traits_mut.sum(axis=1, keepdims=1)
     #     #     norm_denom[norm_denom == 0] = 1
-    #     #     sigma_mut = sigma_mut/norm_denom
+    #     #     traits_mut = traits_mut/norm_denom
     #     #----------------------------------
-    #     return sigma_mut
+    #     return traits_mut
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     # def generate_mutant_set(self, update_mutantIDs=True): #
-    #     sigma_mut = self.generate_mutant_phenotypes()
+    #     traits_mut = self.generate_mutant_phenotypes()
     #     #---------------------------------- 
-    #     beta_mut  = np.repeat(self.beta,  repeats=sigma_mut.shape[0], axis=0) if self.beta.ndim == 2  else self.beta
-    #     kappa_mut = np.repeat(self.kappa, repeats=sigma_mut.shape[0], axis=0) if self.kappa.ndim == 2 else self.kappa
-    #     eta_mut   = np.repeat(self.eta,   repeats=sigma_mut.shape[0], axis=0) if self.eta.ndim == 2   else self.eta
-    #     lamda_mut = np.repeat(self.lamda, repeats=sigma_mut.shape[0], axis=0) if self.lamda.ndim == 2 else self.lamda
-    #     growthfactor_mut = np.repeat(self.growthfactor, repeats=sigma_mut.shape[0], axis=0) if self.growthfactor.ndim == 2 else self.growthfactor
-    #     xi_mut    = np.repeat(self.xi,    repeats=sigma_mut.shape[0], axis=0) if self.xi.ndim == 2    else self.xi
-    #     chi_mut   = np.repeat(self.chi,   repeats=sigma_mut.shape[0], axis=0) if self.chi.ndim == 2   else self.chi
-    #     mu_mut    = np.repeat(self.mu,    repeats=sigma_mut.shape[0], axis=0) if self.mu.ndim == 2    else self.mu
+    #     consumption_rate_mut  = np.repeat(self.consumption_rate,  repeats=traits_mut.shape[0], axis=0) if self.consumption_rate.ndim == 2  else self.consumption_rate
+    #     carrying_capacity_mut = np.repeat(self.carrying_capacity, repeats=traits_mut.shape[0], axis=0) if self.carrying_capacity.ndim == 2 else self.carrying_capacity
+    #     energy_passthru_mut = np.repeat(self.energy_passthru, repeats=traits_mut.shape[0], axis=0) if self.energy_passthru.ndim == 2 else self.energy_passthru
+    #     growth_factor_mut = np.repeat(self.growth_factor, repeats=traits_mut.shape[0], axis=0) if self.growth_factor.ndim == 2 else self.growth_factor
+    #     cost_baseline_mut    = np.repeat(self.cost_baseline,    repeats=traits_mut.shape[0], axis=0) if self.cost_baseline.ndim == 2    else self.cost_baseline
+    #     cost_trait_mut   = np.repeat(self.cost_trait,   repeats=traits_mut.shape[0], axis=0) if self.cost_trait.ndim == 2   else self.cost_trait
+    #     mutation_rate_mut    = np.repeat(self.mutation_rate,    repeats=traits_mut.shape[0], axis=0) if self.mutation_rate.ndim == 2    else self.mutation_rate
     #     #----------------------------------
-    #     # if(self._mean_xi_mut > 0):
-    #     #     xi_mut = self.xi.ravel() - np.random.exponential(scale=self._mean_xi_mut, size=sigma_mut.shape[0])
+    #     # if(self._mean_cost_baseline_mut > 0):
+    #     #     cost_baseline_mut = self.cost_baseline.ravel() - np.random.exponential(scale=self._mean_cost_baseline_mut, size=traits_mut.shape[0])
     #     # else:
-    #     #     xi_mut = np.repeat(self.xi, repeats=sigma_mut.shape[0], axis=0) if self.xi.ndim == 2 else self.xi
+    #     #     cost_baseline_mut = np.repeat(self.cost_baseline, repeats=traits_mut.shape[0], axis=0) if self.cost_baseline.ndim == 2 else self.cost_baseline
     #     #----------------------------------
-    #     mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, growthfactor=growthfactor_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, # mean_xi_mut=self._mean_xi_mut,
+    #     mutant_set = TypeSet(traits=traits_mut, consumption_rate=consumption_rate_mut, carrying_capacity=carrying_capacity_mut, energy_passthru=energy_passthru_mut, growth_factor=growth_factor_mut, cost_baseline=cost_baseline_mut, cost_trait=cost_trait_mut, cost_interaction=self.cost_interaction, mutation_rate=mutation_rate_mut, # mean_cost_baseline_mut=self._mean_cost_baseline_mut,
     #                          # normalize_phenotypes=self.normalize_phenotypes, 
-    #                          binarize_traits_chi_cost_terms=self.binarize_traits_chi_cost_terms, binarize_traits_J_cost_terms=self.binarize_traits_J_cost_terms)
+    #                          binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
     #     #----------------------------------
     #     if(update_mutantIDs):
     #         self._mutantIDs = mutant_set.typeIDs.reshape((self.num_types, self.num_traits))
@@ -355,46 +343,44 @@ class TypeSet():
     #     return mutant_set
 
     def generate_mutant_set(self, type_index=None, update_mutant_indices=True): #
-        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.sigma.shape[0])
+        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.traits.shape[0])
         #----------------------------------
-        sigma_mut            = []
-        beta_mut             = [] if self.beta.ndim == 2 else self.beta
-        kappa_mut            = [] if self.kappa.ndim == 2 else self.kappa
-        eta_mut              = [] if self.eta.ndim == 2 else self.eta
-        lamda_mut            = [] if self.lamda.ndim == 2 else self.lamda
-        growthfactor_mut            = [] if self.growthfactor.ndim == 2 else self.growthfactor
-        xi_mut               = [] if self.xi.ndim == 2 else self.xi
-        chi_mut              = [] if self.chi.ndim == 2 else self.chi
-        mu_mut               = [] if self.mu.ndim == 2 else self.mu
+        traits_mut            = []
+        consumption_rate_mut             = [] if self.consumption_rate.ndim == 2 else self.consumption_rate
+        carrying_capacity_mut            = [] if self.carrying_capacity.ndim == 2 else self.carrying_capacity
+        energy_passthru_mut            = [] if self.energy_passthru.ndim == 2 else self.energy_passthru
+        growth_factor_mut            = [] if self.growth_factor.ndim == 2 else self.growth_factor
+        cost_baseline_mut               = [] if self.cost_baseline.ndim == 2 else self.cost_baseline
+        cost_trait_mut              = [] if self.cost_trait.ndim == 2 else self.cost_trait
+        mutation_rate_mut               = [] if self.mutation_rate.ndim == 2 else self.mutation_rate
         parent_indices_mut   = []
-        generation_rates_mut = []
+        creation_rates_mut = []
         mutant_indices       = []
         #----------------------------------
         for p, parent_idx in enumerate(type_idx):
-            mu_p = self.mu[parent_idx] if self.mu.ndim == 2 else self.mu
+            mutation_rate_p = self.mutation_rate[parent_idx] if self.mutation_rate.ndim == 2 else self.mutation_rate
             mutant_indices.append([])
-            if(np.any(mu_p > 0)):
-                for i in (np.where(mu_p > 0)[0] if mu_p.ndim == 1 else range(self.sigma.shape[1])):
-                    sigma_mut.append(self.sigma[parent_idx] ^ [0 if j!=i else 1 for j in range(self.sigma.shape[1])])
+            if(np.any(mutation_rate_p > 0)):
+                for i in (np.where(mutation_rate_p > 0)[0] if mutation_rate_p.ndim == 1 else range(self.traits.shape[1])):
+                    traits_mut.append(self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])])
                     # - - - - -
-                    if(self.beta.ndim == 2):    beta_mut.append(self.beta[parent_idx])
-                    if(self.kappa.ndim == 2):   kappa_mut.append(self.kappa[parent_idx])
-                    if(self.eta.ndim == 2):     eta_mut.append(  self.eta[parent_idx])
-                    if(self.lamda.ndim == 2):   lamda_mut.append(self.lamda[parent_idx])
-                    if(self.growthfactor.ndim == 2):   growthfactor_mut.append(self.growthfactor[parent_idx])
-                    if(self.xi.ndim == 2):      xi_mut.append(self.xi[parent_idx])
-                    if(self.chi.ndim == 2):     chi_mut.append(self.chi[parent_idx])
-                    if(self.mu.ndim == 2):      mu_mut.append(self.mu[parent_idx])
+                    if(self.consumption_rate.ndim == 2):    consumption_rate_mut.append(self.consumption_rate[parent_idx])
+                    if(self.carrying_capacity.ndim == 2):   carrying_capacity_mut.append(self.carrying_capacity[parent_idx])
+                    if(self.energy_passthru.ndim == 2):   energy_passthru_mut.append(self.energy_passthru[parent_idx])
+                    if(self.growth_factor.ndim == 2):   growth_factor_mut.append(self.growth_factor[parent_idx])
+                    if(self.cost_baseline.ndim == 2):      cost_baseline_mut.append(self.cost_baseline[parent_idx])
+                    if(self.cost_trait.ndim == 2):     cost_trait_mut.append(self.cost_trait[parent_idx])
+                    if(self.mutation_rate.ndim == 2):      mutation_rate_mut.append(self.mutation_rate[parent_idx])
                     # - - - - -
-                    generation_rates_mut.append(mu_p[i] if mu_p.ndim == 1 else mu_p)
+                    creation_rates_mut.append(mutation_rate_p[i] if mutation_rate_p.ndim == 1 else mutation_rate_p)
                     # - - - - -
                     parent_indices_mut.append(parent_idx)
                     # - - - - -
-                    mutant_indices[p].append(len(sigma_mut)-1)
+                    mutant_indices[p].append(len(traits_mut)-1)
         #----------------------------------
-        mutant_set = TypeSet(sigma=sigma_mut, beta=beta_mut, kappa=kappa_mut, eta=eta_mut, lamda=lamda_mut, growthfactor=growthfactor_mut, xi=xi_mut, chi=chi_mut, J=self.J, mu=mu_mut, 
-                             generation_rates=generation_rates_mut, parent_indices=parent_indices_mut,
-                             binarize_traits_chi_cost_terms=self.binarize_traits_chi_cost_terms, binarize_traits_J_cost_terms=self.binarize_traits_J_cost_terms)
+        mutant_set = TypeSet(traits=traits_mut, consumption_rate=consumption_rate_mut, carrying_capacity=carrying_capacity_mut, energy_passthru=energy_passthru_mut, growth_factor=growth_factor_mut, cost_baseline=cost_baseline_mut, cost_trait=cost_trait_mut, cost_interaction=self.cost_interaction, mutation_rate=mutation_rate_mut,
+                             creation_rates=creation_rates_mut, parent_indices=parent_indices_mut,
+                             binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
         if(update_mutant_indices):
             self._mutant_indices = mutant_indices
@@ -404,7 +390,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, type_set=None, sigma=None, beta=None, kappa=None, eta=None, lamda=None, growthfactor=None, xi=None, chi=None, mu=None, generation_rates=None, parent_index=None, parent_id=None, ref_type_idx=None): # type_index=None, mean_xi_mut=None, 
+    def add_type(self, type_set=None, traits=None, consumption_rate=None, carrying_capacity=None, energy_passthru=None, growth_factor=None, cost_baseline=None, cost_trait=None, mutation_rate=None, creation_rates=None, parent_index=None, parent_id=None, ref_type_idx=None): # type_index=None, mean_cost_baseline_mut=None,
         parent_idx   = np.where(self.typeIDs==parent_id)[0] if parent_id is not None else parent_index
         ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
         #----------------------------------
@@ -414,17 +400,16 @@ class TypeSet():
             else:
                 utils.error(f"Error in TypeSet add_type(): type_set argument expects object of TypeSet type.")
         else:
-            added_type_set = TypeSet(sigma=sigma if sigma is not None else self.sigma[ref_type_idx], 
-                                         beta=beta if beta is not None else self.beta[ref_type_idx],  
-                                         kappa=kappa if kappa is not None else self.kappa[ref_type_idx],  
-                                         eta=eta if eta is not None else self.eta[ref_type_idx],  
-                                         lamda=lamda if lamda is not None else self.lamda[ref_type_idx],  
-                                         growthfactor=growthfactor if growthfactor is not None else self.growthfactor[ref_type_idx],  
-                                         xi=xi if xi is not None else self.xi[ref_type_idx],  
-                                         chi=chi if chi is not None else self.chi[ref_type_idx], 
-                                         mu=mu if mu is not None else self.mu[ref_type_idx],
-                                         # mean_xi_mut=mean_xi_mut if mean_xi_mut is not None else self._mean_xi_mut
-                                         generation_rates=generation_rates if generation_rates is not None else self.generation_rates[ref_type_idx]
+            added_type_set = TypeSet(traits=traits if traits is not None else self.traits[ref_type_idx],
+                                         consumption_rate=consumption_rate if consumption_rate is not None else self.consumption_rate[ref_type_idx],
+                                         carrying_capacity=carrying_capacity if carrying_capacity is not None else self.carrying_capacity[ref_type_idx],
+                                         energy_passthru=energy_passthru if energy_passthru is not None else self.energy_passthru[ref_type_idx],
+                                         growth_factor=growth_factor if growth_factor is not None else self.growth_factor[ref_type_idx],
+                                         cost_baseline=cost_baseline if cost_baseline is not None else self.cost_baseline[ref_type_idx],
+                                         cost_trait=cost_trait if cost_trait is not None else self.cost_trait[ref_type_idx],
+                                         mutation_rate=mutation_rate if mutation_rate is not None else self.mutation_rate[ref_type_idx],
+                                         # mean_cost_baseline_mut=mean_cost_baseline_mut if mean_cost_baseline_mut is not None else self._mean_cost_baseline_mut
+                                         creation_rates=creation_rates if creation_rates is not None else self.creation_rates[ref_type_idx]
                                          )
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != added_type_set.num_traits): 
@@ -432,16 +417,15 @@ class TypeSet():
         #----------------------------------
         added_type_indices = list(range(self.num_types, self.num_types+added_type_set.num_types))
         #----------------------------------
-        self._sigma = self._sigma.add(added_type_set.sigma)
-        self._beta  = self._beta.add(added_type_set.beta)   if isinstance(self._beta,  utils.ExpandableArray) else self._beta
-        self._kappa = self._kappa.add(added_type_set.kappa) if isinstance(self._kappa, utils.ExpandableArray) else self._kappa
-        self._eta   = self._eta.add(added_type_set.eta)     if isinstance(self._eta,   utils.ExpandableArray) else self._eta
-        self._lamda = self._lamda.add(added_type_set.lamda) if isinstance(self._lamda, utils.ExpandableArray) else self._lamda
-        self._growthfactor = self._growthfactor.add(added_type_set.growthfactor) if isinstance(self._growthfactor, utils.ExpandableArray) else self._growthfactor
-        self._xi    = self._xi.add(added_type_set.xi)       if isinstance(self._xi,    utils.ExpandableArray) else self._xi
-        self._chi   = self._chi.add(added_type_set.chi)     if isinstance(self._chi,   utils.ExpandableArray) else self._chi
-        self._mu    = self._mu.add(added_type_set.mu)       if isinstance(self._mu,    utils.ExpandableArray) else self._mu
-        self._generation_rates = self._generation_rates.add(added_type_set.generation_rates) if isinstance(self._generation_rates, utils.ExpandableArray) else self._generation_rates
+        self._traits = self._traits.add(added_type_set.traits)
+        self._consumption_rate  = self._consumption_rate.add(added_type_set.consumption_rate)   if isinstance(self._consumption_rate,  utils.ExpandableArray) else self._consumption_rate
+        self._carrying_capacity = self._carrying_capacity.add(added_type_set.carrying_capacity) if isinstance(self._carrying_capacity, utils.ExpandableArray) else self._carrying_capacity
+        self._energy_passthru = self._energy_passthru.add(added_type_set.energy_passthru) if isinstance(self._energy_passthru, utils.ExpandableArray) else self._energy_passthru
+        self._growth_factor = self._growth_factor.add(added_type_set.growth_factor) if isinstance(self._growth_factor, utils.ExpandableArray) else self._growth_factor
+        self._cost_baseline    = self._cost_baseline.add(added_type_set.cost_baseline)       if isinstance(self._cost_baseline,    utils.ExpandableArray) else self._cost_baseline
+        self._cost_trait   = self._cost_trait.add(added_type_set.cost_trait)     if isinstance(self._cost_trait,   utils.ExpandableArray) else self._cost_trait
+        self._mutation_rate    = self._mutation_rate.add(added_type_set.mutation_rate)       if isinstance(self._mutation_rate,    utils.ExpandableArray) else self._mutation_rate
+        self._creation_rates = self._creation_rates.add(added_type_set.creation_rates) if isinstance(self._creation_rates, utils.ExpandableArray) else self._creation_rates
         #----------------------------------
         # print()
         # print("self._parent_indices", self._parent_indices, type(self._parent_indices), "added_type_set.parent_indices", added_type_set.parent_indices, type(added_type_set.parent_indices))
@@ -502,35 +486,34 @@ class TypeSet():
         if(type_idx is None):
             utils.error(f"Error in TypeSet get_type(): A type index or type id must be given.")
         #----------------------------------
-        return TypeSet(sigma  = self.sigma[type_idx], 
-                        beta  = self.beta[type_idx]  if self.beta.ndim == 2   else self.beta, 
-                        kappa = self.kappa[type_idx] if self.kappa.ndim == 2  else self.kappa, 
-                        eta   = self.eta[type_idx]   if self.eta.ndim == 2    else self.eta, 
-                        lamda = self.lamda[type_idx] if self.lamda.ndim == 2  else self.lamda, 
-                        growthfactor = self.growthfactor[type_idx] if self.growthfactor.ndim == 2  else self.growthfactor, 
-                        xi    = self.xi[type_idx]    if self.xi.ndim == 2     else self.xi, 
-                        chi   = self.chi[type_idx]   if self.chi.ndim == 2    else self.chi, 
-                        mu    = self.mu[type_idx]    if self.mu.ndim == 2     else self.mu,
-                        J     = self.J,
-                        generation_rates=self.generation_rates[type_idx] if self.generation_rates is not None and self.generation_rates.ndim == 2 else self.generation_rates, 
+        return TypeSet(traits  = self.traits[type_idx],
+                        consumption_rate  = self.consumption_rate[type_idx]  if self.consumption_rate.ndim == 2   else self.consumption_rate,
+                        carrying_capacity = self.carrying_capacity[type_idx] if self.carrying_capacity.ndim == 2  else self.carrying_capacity,
+                        energy_passthru = self.energy_passthru[type_idx] if self.energy_passthru.ndim == 2  else self.energy_passthru,
+                        growth_factor = self.growth_factor[type_idx] if self.growth_factor.ndim == 2  else self.growth_factor,
+                        cost_baseline    = self.cost_baseline[type_idx]    if self.cost_baseline.ndim == 2     else self.cost_baseline,
+                        cost_trait   = self.cost_trait[type_idx]   if self.cost_trait.ndim == 2    else self.cost_trait,
+                        mutation_rate    = self.mutation_rate[type_idx]    if self.mutation_rate.ndim == 2     else self.mutation_rate,
+                        cost_interaction     = self.cost_interaction,
+                        creation_rates=self.creation_rates[type_idx] if self.creation_rates is not None and self.creation_rates.ndim == 2 else self.creation_rates,
                         parent_indices=self.parent_indices[type_idx],
-                        # mean_xi_mut = self._mean_xi_mut,
+                        # mean_cost_baseline_mut = self._mean_cost_baseline_mut,
                         # normalize_phenotypes           = self.normalize_phenotypes,
-                        binarize_traits_chi_cost_terms = self.binarize_traits_chi_cost_terms,
-                        binarize_traits_J_cost_terms   = self.binarize_traits_J_cost_terms ) 
+                        binarize_trait_costs = self.binarize_trait_costs,
+                        binarize_interaction_costs   = self.binarize_interaction_costs )
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|||
 
-    def assign_type_ids(self, type_index=None, sigma=None):
-        # print("assignID >>", "type_index=", type_index, "sigma=", sigma)
-        sigma = sigma if sigma is not None else self.sigma
-        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(sigma.shape[0])
-        # Convert binary sigma arrays to integer IDs
+    def assign_type_ids(self, type_index=None, traits=None):
+        # print("assignID >>", "type_index=", type_index, "traits=", traits)
+        traits = traits if traits is not None else self.traits
+        type_idx = utils.treat_as_list(type_index) if type_index is not None else range(traits.shape[0])
+        # Convert binary traits arrays to integer IDs
         typeIDs = []
-        for u in range(len(sigma)):
+        for u in range(len(traits)):
             intID = 0
-            for bit in sigma[u].ravel():
+            for bit in traits[u].ravel():
                 intID = (intID << 1) | bit
             typeIDs.append(intID)
         return typeIDs #if len(typeIDs) > 1 else typeIDs[0]
@@ -539,9 +522,9 @@ class TypeSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|||
 
     # new but bad
-    # def get_indices(self, type_id=None, type_index=None, sigma=None):
-    #     sigma = sigma if sigma is not None else self.sigma
-    #     return utils.treat_as_list(type_index) if type_index is not None else [self._typeID_indices[tid] for tid in utils.treat_as_list(type_id)] if type_id is not None else np.arange(0, len(sigma), 1)
+    # def get_indices(self, type_id=None, type_index=None, traits=None):
+    #     traits = traits if traits is not None else self.traits
+    #     return utils.treat_as_list(type_index) if type_index is not None else [self._typeID_indices[tid] for tid in utils.treat_as_list(type_id)] if type_id is not None else np.arange(0, len(traits), 1)
     
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~|||
@@ -569,16 +552,15 @@ class TypeSet():
     #         type_idx = np.arange(0, self.num_types, 1)
     #     #----------------------------------
     #     return {'num_types':    len(type_idx),
-    #             'sigma':        self.sigma[type_idx],
-    #             'beta':         self.beta  if self.beta.ndim < 2  else self.beta[type_idx],
-    #             'kappa':        self.kappa if self.kappa.ndim < 2 else self.kappa[type_idx],
-    #             'eta':          self.eta   if self.eta.ndim < 2   else self.eta[type_idx],
-    #             'lamda':        self.lamda if self.lamda.ndim < 2 else self.lamda[type_idx],
-    #             'growthfactor':        self.growthfactor if self.growthfactor.ndim < 2 else self.growthfactor[type_idx],
-    #             'xi':           self.xi    if self.xi.ndim < 2    else self.xi[type_idx],
-    #             'chi':          self.chi   if self.chi.ndim < 2   else self.chi[type_idx],
-    #             'J':            self.J,
-    #             'mu':           self.mu    if self.mu.ndim < 2    else self.mu[type_idx],
+    #             'traits':        self.traits[type_idx],
+    #             'consumption_rate':         self.consumption_rate  if self.consumption_rate.ndim < 2  else self.consumption_rate[type_idx],
+    #             'carrying_capacity':        self.carrying_capacity if self.carrying_capacity.ndim < 2 else self.carrying_capacity[type_idx],
+    #             'energy_passthru':        self.energy_passthru if self.energy_passthru.ndim < 2 else self.energy_passthru[type_idx],
+    #             'growth_factor':        self.growth_factor if self.growth_factor.ndim < 2 else self.growth_factor[type_idx],
+    #             'cost_baseline':           self.cost_baseline    if self.cost_baseline.ndim < 2    else self.cost_baseline[type_idx],
+    #             'cost_trait':          self.cost_trait   if self.cost_trait.ndim < 2   else self.cost_trait[type_idx],
+    #             'cost_interaction':            self.cost_interaction,
+    #             'mutation_rate':           self.mutation_rate    if self.mutation_rate.ndim < 2    else self.mutation_rate[type_idx],
     #             'energy_costs': self.energy_costs[type_idx]}
 
     # new but bad
@@ -587,17 +569,16 @@ class TypeSet():
     #     print("get_dynamics_params @@@", type_id, type_index, "-> type_idx", type_idx)
     #     #----------------------------------
     #     return {'num_types':    len(type_idx),
-    #             'sigma':        self.sigma[type_idx],
-    #             'beta':         self.beta  if self.beta.ndim < 2  else self.beta[type_idx],
-    #             'kappa':        self.kappa if self.kappa.ndim < 2 else self.kappa[type_idx],
-    #             'eta':          self.eta   if self.eta.ndim < 2   else self.eta[type_idx],
-    #             'lamda':        self.lamda if self.lamda.ndim < 2 else self.lamda[type_idx],
-    #             'growthfactor':        self.growthfactor if self.growthfactor.ndim < 2 else self.growthfactor[type_idx],
-    #             'xi':           self.xi    if self.xi.ndim < 2    else self.xi[type_idx],
-    #             'chi':          self.chi   if self.chi.ndim < 2   else self.chi[type_idx],
-    #             'J':            self.J,
-    #             # 'mu':           self.mu    if self.mu.ndim < 2    else self.mu[type_idx],
-    #             'generation_rates': (self.generation_rates if self.generation_rates.ndim < 2 else self.generation_rates[type_idx]) if self.generation_rates is not None else None,
+    #             'traits':        self.traits[type_idx],
+    #             'consumption_rate':         self.consumption_rate  if self.consumption_rate.ndim < 2  else self.consumption_rate[type_idx],
+    #             'carrying_capacity':        self.carrying_capacity if self.carrying_capacity.ndim < 2 else self.carrying_capacity[type_idx],
+    #             'energy_passthru':        self.energy_passthru if self.energy_passthru.ndim < 2 else self.energy_passthru[type_idx],
+    #             'growth_factor':        self.growth_factor if self.growth_factor.ndim < 2 else self.growth_factor[type_idx],
+    #             'cost_baseline':           self.cost_baseline    if self.cost_baseline.ndim < 2    else self.cost_baseline[type_idx],
+    #             'cost_trait':          self.cost_trait   if self.cost_trait.ndim < 2   else self.cost_trait[type_idx],
+    #             'cost_interaction':            self.cost_interaction,
+    #             # 'mutation_rate':           self.mutation_rate    if self.mutation_rate.ndim < 2    else self.mutation_rate[type_idx],
+    #             'creation_rates': (self.creation_rates if self.creation_rates.ndim < 2 else self.creation_rates[type_idx]) if self.creation_rates is not None else None,
     #             'energy_costs': self.energy_costs[type_idx]}
 
     def get_dynamics_params(self, type_index=None):
@@ -605,18 +586,17 @@ class TypeSet():
         # print("get_dynamics_params @@@", type_index, "-> type_idx", type_idx)
         #----------------------------------
         return {'num_types':    len(type_idx),
-                'sigma':        self.sigma[type_idx],
-                'beta':         self.beta  if self.beta.ndim < 2  else self.beta[type_idx],
-                'kappa':        self.kappa if self.kappa.ndim < 2 else self.kappa[type_idx],
-                'eta':          self.eta   if self.eta.ndim < 2   else self.eta[type_idx],
-                'lamda':        self.lamda if self.lamda.ndim < 2 else self.lamda[type_idx],
-                'growthfactor':        self.growthfactor if self.growthfactor.ndim < 2 else self.growthfactor[type_idx],
-                'xi':           self.xi    if self.xi.ndim < 2    else self.xi[type_idx],
-                'chi':          self.chi   if self.chi.ndim < 2   else self.chi[type_idx],
-                'J':            self.J,
+                'traits':        self.traits[type_idx],
+                'consumption_rate':         self.consumption_rate  if self.consumption_rate.ndim < 2  else self.consumption_rate[type_idx],
+                'carrying_capacity':        self.carrying_capacity if self.carrying_capacity.ndim < 2 else self.carrying_capacity[type_idx],
+                'energy_passthru':        self.energy_passthru if self.energy_passthru.ndim < 2 else self.energy_passthru[type_idx],
+                'growth_factor':        self.growth_factor if self.growth_factor.ndim < 2 else self.growth_factor[type_idx],
+                'cost_baseline':           self.cost_baseline    if self.cost_baseline.ndim < 2    else self.cost_baseline[type_idx],
+                'cost_trait':          self.cost_trait   if self.cost_trait.ndim < 2   else self.cost_trait[type_idx],
+                'cost_interaction':            self.cost_interaction,
                 'energy_costs': self.energy_costs[type_idx],
-                # 'mu':           self.mu    if self.mu.ndim < 2    else self.mu[type_idx],
-                'generation_rates': (self.generation_rates if self.generation_rates.ndim < 2 else self.generation_rates[type_idx]) if self.generation_rates is not None else None,
+                # 'mu':           self.mu    if self.mu.ndim < 2    else self.mutation_rate[type_idx],
+                'creation_rates': (self.creation_rates if self.creation_rates.ndim < 2 else self.creation_rates[type_idx]) if self.creation_rates is not None else None,
                 'parent_indices': self.parent_indices[type_idx]
                 }
 
@@ -628,16 +608,15 @@ class TypeSet():
         if(len(type_order) < self.num_types):
             utils.error("Error in TypeSet.reorder_types(): The ordering provided has fewer indices than types.")
         #----------------------------------
-        self._sigma = self._sigma.reorder(type_order)
-        self._beta  = self._beta.reorder(type_order)  if isinstance(self._beta,  utils.ExpandableArray) else self._beta
-        self._kappa = self._kappa.reorder(type_order) if isinstance(self._kappa, utils.ExpandableArray) else self._kappa
-        self._eta   = self._eta.reorder(type_order)   if isinstance(self._eta,   utils.ExpandableArray) else self._eta
-        self._lamda = self._lamda.reorder(type_order) if isinstance(self._lamda, utils.ExpandableArray) else self._lamda
-        self._growthfactor = self._growthfactor.reorder(type_order) if isinstance(self._growthfactor, utils.ExpandableArray) else self._growthfactor
-        self._xi    = self._xi.reorder(type_order)    if isinstance(self._xi,    utils.ExpandableArray) else self._xi
-        self._chi   = self._chi.reorder(type_order)   if isinstance(self._chi,   utils.ExpandableArray) else self._chi
-        self._mu    = self._mu.reorder(type_order)    if isinstance(self._mu,    utils.ExpandableArray) else self._mu
-        self._generation_rates = self._generation_rates.reorder(type_order) if isinstance(self._generation_rates, utils.ExpandableArray) else self._generation_rates
+        self._traits = self._traits.reorder(type_order)
+        self._consumption_rate  = self._consumption_rate.reorder(type_order)  if isinstance(self._consumption_rate,  utils.ExpandableArray) else self._consumption_rate
+        self._carrying_capacity = self._carrying_capacity.reorder(type_order) if isinstance(self._carrying_capacity, utils.ExpandableArray) else self._carrying_capacity
+        self._energy_passthru = self._energy_passthru.reorder(type_order) if isinstance(self._energy_passthru, utils.ExpandableArray) else self._energy_passthru
+        self._growth_factor = self._growth_factor.reorder(type_order) if isinstance(self._growth_factor, utils.ExpandableArray) else self._growth_factor
+        self._cost_baseline    = self._cost_baseline.reorder(type_order)    if isinstance(self._cost_baseline,    utils.ExpandableArray) else self._cost_baseline
+        self._cost_trait   = self._cost_trait.reorder(type_order)   if isinstance(self._cost_trait,   utils.ExpandableArray) else self._cost_trait
+        self._mutation_rate    = self._mutation_rate.reorder(type_order)    if isinstance(self._mutation_rate,    utils.ExpandableArray) else self._mutation_rate
+        self._creation_rates = self._creation_rates.reorder(type_order) if isinstance(self._creation_rates, utils.ExpandableArray) else self._creation_rates
         self._energy_costs   = None # reset to recalculate upon next reference
         self._typeIDs       = np.array(self._typeIDs)[type_order].tolist() if self._typeIDs is not None else None
         self._lineageIDs    = np.array(self._lineageIDs)[type_order].tolist() if self._lineageIDs is not None else None
@@ -665,7 +644,7 @@ class TypeSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_phenotype_strings(self):
-        return [ ''.join(['1' if sigma_vector[i] != 0 else '0' for i in range(len(sigma_vector))]) for sigma_vector in self.sigma ]
+        return [ ''.join(['1' if traits_vector[i] != 0 else '0' for i in range(len(traits_vector))]) for traits_vector in self.traits ]
 
 
 
