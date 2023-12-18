@@ -12,11 +12,11 @@ class ResourceSet():
     RESOURCE_INFLUX_CONSTANT          = 0
     RESOURCE_INFLUX_TEMPORAL          = 1
 
-    def __init__(self, num_resources = None,
-                       influx_rate           = 0,
-                       decay_rate           = 1,
-                       energy_content         = 1,
-                       cross_production             = None ):
+    def __init__(self, num_resources    = None,
+                       influx_rate      = 0,
+                       decay_rate       = 1,
+                       energy_content   = 1,
+                       cross_production = None ):
 
         # Determine the number of resources:
         if(isinstance(influx_rate, (list, np.ndarray))):
