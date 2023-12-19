@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 import scipy
-
+# from numba import jit
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -211,6 +211,22 @@ def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
                 error(f"Error in reshape(): input with shape {orig_shape} could not be reshaped to the target dimensionality {target_shape}.")
         return  arr
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# def find_first(vec, needle):
+# 	for k, val in enumerate(vec):
+# 		if val == needle:
+# 			return k
+# 	return -1
+
+# @jit(nopython=True)
+def find_first(item, vec):
+    """return the index of the first occurence of item in vec"""
+    for i, val in enumerate(vec):
+        if val == item:
+            return i
+    return None
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

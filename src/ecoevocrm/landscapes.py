@@ -183,6 +183,14 @@ class NKLandscape:
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def merge_landscapes(dict_A, dict_B, prefix_A='', prefix_B='', suffix_A='', suffix_B=''):
+    dict_A = {f'{prefix_A}{key}{suffix_A}': fitness for key, fitness in dict_A.items()}
+    dict_B = {f'{prefix_B}{key}{suffix_B}': fitness for key, fitness in dict_B.items()}
+    merged_dict = {**dict_A, **dict_B} # this merges the two dicts (B overwrites A if overlapping keys)
+    return merged_dict
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def mutsel_equilibrium(landscape, mutation_rate, max_mutation_step=1):
     
     R = np.diag(landscape.fitnesses)
