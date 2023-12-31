@@ -6,6 +6,203 @@ import scipy
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+class SystemParameter():
+
+    def __init__(self, values, num_types, num_traits, force_type_dim=False, force_trait_dim=False):
+
+        self.num_types  = num_types
+        self.num_traits = num_traits
+
+        self.force_type_dim  = force_type_dim
+        self.force_trait_dim = force_trait_dim
+
+        # if(isinstance(values, SystemParameter)):
+
+
+        if(not isinstance(values, (list, np.ndarray))):  # scalar
+            if(force_type_dim and force_trait_dim):
+                self._values = ExpandableArray( np.full(shape=(num_types, num_traits), fill_value=values) )
+                self.has_type_dim  = True
+                self.has_trait_dim = True
+            elif(force_type_dim):
+                self._values = np.full(shape=(num_types,), fill_value=values)
+                self.has_type_dim  = True
+                self.has_trait_dim = False
+            elif(force_trait_dim):
+                self._values = np.full(shape=(num_traits,), fill_value=values)
+                self.has_type_dim  = False
+                self.has_trait_dim = True
+            else:
+                self._values = np.array([values])[0] # makes this a np.int/float which has shape and ndim attributes
+                self.has_type_dim  = False
+                self.has_trait_dim = False
+        else:  # list/array
+            arr = np.array(values)
+            if(arr.ndim == 1):
+                if(len(arr) == num_traits):
+                    if(force_type_dim):
+                        if(np.all(arr == arr[0]) and not force_trait_dim):  # all elements equal
+                            self._values = np.full(shape=(num_types,), fill_value=arr[0])
+                            self.has_type_dim  = True
+                            self.has_trait_dim = False
+                        else:
+                            self._values = ExpandableArray( np.tile(arr.reshape(1, self.num_traits), (self.num_types, 1)) )
+                            self.has_type_dim  = True
+                            self.has_trait_dim = True
+                    else:
+                        if(np.all(arr == arr[0]) and not force_trait_dim):  # all elements equal
+                            self._values = arr[0]
+                            self.has_type_dim  = False
+                            self.has_trait_dim = False
+                        else:
+                            self._values = arr
+                            self.has_type_dim  = False
+                            self.has_trait_dim = True
+                elif(len(arr) == num_types):
+                    if(force_trait_dim):
+                        if(np.all(arr == arr[0]) and not force_type_dim):  # all elements equal
+                            self._values = np.full(shape=(num_traits,), fill_value=arr[0])
+                            self.has_type_dim  = False
+                            self.has_trait_dim = True
+                        else:
+                            self._values = ExpandableArray( np.tile(arr.reshape(self.num_types, 1), (1, self.num_traits)) )
+                            self.has_type_dim  = True
+                            self.has_trait_dim = True
+                    else:
+                        if(np.all(arr == arr[0]) and not force_type_dim):  # all elements equal
+                            self._values = arr[0]
+                            self.has_type_dim  = False
+                            self.has_trait_dim = False
+                        else:
+                            self._values = arr
+                            self.has_type_dim  = True
+                            self.has_trait_dim = False
+                else:
+                    error(f"Error in SystemParameter.__init__(): input with shape {arr.shape} does not correspond to the number of types ({num_types}) or traits ({num_traits}).")
+            elif(arr.ndim == 2):
+                if(arr.shape[0] == num_types and arr.shape[1] == num_traits):
+                    self._values = ExpandableArray( arr )  # as is
+
+                    self.has_type_dim  = True
+                    self.has_trait_dim = True
+                else:
+                    error(f"Error in SystemParameter.__init__(): input with shape {arr.shape} does not correspond to the number of types ({num_types}) and traits ({num_traits}).")
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @property
+    def shape(self):
+        return self._values.shape
+
+    @property
+    def ndim(self):
+        return self._values.ndim
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def values(self, force_type_dim=False, force_trait_dim=False):
+        if(self.ndim == 0):  # scalar
+            if(force_type_dim and force_trait_dim):
+                return np.full(shape=(self.num_types, self.num_traits), fill_value=self._values)
+            elif(force_type_dim):
+                return np.full(shape=(self.num_types,), fill_value=self._values)
+            elif(force_trait_dim):
+                return np.full(shape=(self.num_traits,), fill_value=self._values)
+            else:
+                return self._values  # as is
+        elif(self.ndim == 1):  # 1d array
+            if(len(self._values) == self.num_types and force_trait_dim):
+                return np.tile(self._values.reshape(self.num_types, 1), (1, self.num_traits))
+            elif(len(self._values) == self.num_traits and force_type_dim):
+                return np.tile(self._values.reshape(1, self.num_traits), (self.num_types, 1))
+            else:
+                return self._values  # as is
+        else:  # 2d ExpandableArray
+            return self._values.values  # as is
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def get_type(self, type, values_only=False):
+        type_idx  = treat_as_list(type)
+        # - - - -
+        type_values = self.values()[type_idx] if self.has_type_dim else self.values()
+        if(type_values.ndim == 2 and len(type_idx) == 1):
+            type_values = type_values.ravel()
+        # - - - -
+        if(values_only):
+            return type_values
+        else:
+            return SystemParameter(values=type_values, num_types=len(type_idx), num_traits=self.num_traits, force_type_dim=self.force_type_dim, force_trait_dim=self.force_trait_dim)
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    # def get_type_values(self, type):
+    #     type_idx  = treat_as_list(type)
+    #     # - - - -
+    #     if(self.has_type_dim):
+    #         if(len(type_idx) == 1):
+    #             return self.values()[type_idx].ravel()
+    #         else:
+    #             return self.values()[type_idx]
+    #     else:
+    #         return self.values()
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    @staticmethod
+    def combine(params_A, params_B, force_type_dim=False, force_trait_dim=False):
+        if(params_A is None and params_B is not None): return params_B
+        if(params_B is None and params_A is not None): return params_A
+        # - - - -
+        if(params_A.num_traits != params_B.num_traits):
+            error(f"Error in SystemParameter.add(): The params_B have a different num_traits ({params_B.num_traits}) than the base params ({params_A.num_traits})")
+        # - - - -
+        valsA = params_A.values()
+        valsB = params_B.values()
+        comb_num_types       = params_A.num_types + params_B.num_types
+        comb_num_traits      = params_A.num_traits
+        comb_force_type_dim  = (force_type_dim | params_A.force_type_dim | params_B.force_type_dim)
+        comb_force_trait_dim = (force_trait_dim | params_A.force_trait_dim | params_B.force_trait_dim)
+        # - - - -
+        # If both param sets are the same arrays:
+        if(np.array_equal(valsA, valsB)):
+            return SystemParameter(values=valsA, num_types=comb_num_types, num_traits=comb_num_traits, force_type_dim=comb_force_type_dim, force_trait_dim=comb_force_trait_dim)
+        # - - - -
+        # If all elements of both param sets are a constant value:
+        if((valsA.ndim == 0 and np.all(valsB == valsA)) or (valsA.ndim > 0 and np.all(valsA == valsA[0]) and np.all(valsB == valsA[0]))):
+            return SystemParameter(values=valsA[0], num_types=comb_num_types, num_traits=comb_num_traits, force_type_dim=comb_force_type_dim, force_trait_dim=comb_force_trait_dim)
+        # - - - -
+        # Otherwise, we need to make sure both param sets have type dimensions - and matching has_trait_dim - so we can concatenate them:
+        if(not params_A.has_type_dim):
+            valsA = valsA.reshape(1, params_A.num_traits) if params_A.has_trait_dim else valsA.reshape(1, 1)
+            valsA = np.tile(valsA, (params_A.num_types, 1))
+            valsA = valsA.ravel() if not params_A.has_trait_dim else valsA
+        if(not params_B.has_type_dim):
+            valsB = valsB.reshape(1, params_B.num_traits) if params_B.has_trait_dim else valsB.reshape(1, 1)
+            valsB = np.tile(valsB, (params_B.num_types, 1))
+            valsB = valsB.ravel() if not params_B.has_trait_dim else valsB
+        if(params_A.has_trait_dim and not params_B.has_trait_dim):
+            valsB = np.tile(valsB.reshape(params_B.num_types, 1), (1, params_B.num_traits))
+        if(params_B.has_trait_dim and not params_A.has_trait_dim):
+            valsA = np.tile(valsA.reshape(params_A.num_types, 1), (1, params_A.num_traits))
+        return SystemParameter(values=np.concatenate([valsA, valsB]), num_types=comb_num_types, num_traits=comb_num_traits, force_type_dim=comb_force_type_dim, force_trait_dim=comb_force_trait_dim)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def reorder(self, type_order):
+        if(self.has_type_dim):
+            if isinstance(self._values, ExpandableArray):
+                self._values.reorder(type_order)
+            else:
+                self._values = self._values[type_order]
+        return
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 class ExpandableArray():
 
     def __init__(self, arr, alloc_shape=None, dtype='float64', default_expand_factor=2):
@@ -34,6 +231,10 @@ class ExpandableArray():
     @property
     def values(self):
         return self._arr[:self._shape[0], :self._shape[1]]
+
+    @property
+    def ndim(self):
+        return self.values.ndim
 
     def expand_alloc(self, new_alloc):
         if(new_alloc[0] < self._alloc[0] or new_alloc[1] < self._alloc[1]):
