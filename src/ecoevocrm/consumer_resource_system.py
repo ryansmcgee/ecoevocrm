@@ -10,7 +10,6 @@ from ecoevocrm.type_set import *
 from ecoevocrm.resource_set import *
 import ecoevocrm.utils as utils
 
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 class ConsumerResourceSystem():
@@ -167,7 +166,6 @@ class ConsumerResourceSystem():
         #----------------------------------
         self.mutant_set         = self.type_set.generate_mutant_set()
         # self.segregant_set      = self.type_set.generate_segregant_set()
-        pass
         # self.transconjugant_set = self.type_set.generate_transconjugant_set()
 
         #""""""""""""""""""""""""""""""""""
@@ -381,7 +379,6 @@ class ConsumerResourceSystem():
             self.mutant_selcoeffs = self.mutant_fitnesses - self.mutant_fitnesses.mean()
             self.mutant_selcoeffs[self.mutant_selcoeffs < 0] = 0
 
-
             self.mutation_propensities = N_t[mutant_parent_indices] * mutant_rates * self.mutant_fitnesses * self.mutant_selcoeffs
             self.mutation_propensities[self.mutation_propensities < 0] = 0  # negative propensities due to negative growthrate or selcoeff are zeroed out
 
@@ -508,7 +505,7 @@ class ConsumerResourceSystem():
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
         else:
             # Add the mutant to the population at an establishment abundance equal to 1/dfitness:
-            self.add_type(mutant, abundance=mutant_abundance, parent_index=parent_idx)
+            self.add_type(mutant, abundance=mutant_abundance)#, parent_index=parent_idx)
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
         #----------------------------------
@@ -523,7 +520,7 @@ class ConsumerResourceSystem():
         abundances_abs = N_t[N_t > 0]
         return -1 if np.any(
             abundances_abs < self.threshold_min_abs_abundance) else 1  # this line sometimes leads to "ValueError: f(a) and f(b) must have different signs"
-        # return (np.min(abundances_abs - self.threshold_min_abs_abundance)) # this line -alos- sometimes leads to "ValueError: f(a) and f(b) must have different signs"
+        # return (np.min(abundances_abs - self.threshold_min_abs_abundance)) # this line -also- sometimes leads to "ValueError: f(a) and f(b) must have different signs"
     #------------------------------
     event_low_abundance.direction = -1
     event_low_abundance.terminal = True
@@ -541,12 +538,12 @@ class ConsumerResourceSystem():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, new_type_set=None, abundance=0, parent_index=None, parent_id=None):  # , index=None, ):
+    def add_type(self, new_type_set=None, abundance=0):#, parent_index=None, parent_id=None):  # , index=None, ):
         abundance = utils.treat_as_list(abundance)
         #----------------------------------
-        preexisting_typeIDs = self.type_set.typeIDs
+        # preexisting_typeIDs = self.type_set.typeIDs
         #----------------------------------
-        new_type_indices = self.type_set.add_type(new_type_set, parent_index=parent_index, parent_id=parent_id)
+        new_type_indices = self.type_set.add_type(new_type_set)#, parent_index=parent_index, parent_id=parent_id)
         #----------------------------------
         self._N_series = self._N_series.add(np.zeros(shape=(new_type_set.num_types, self.N_series.shape[1])))
         self.set_type_abundance(type_index=list(range(self.type_set.num_types - new_type_set.num_types, self.type_set.num_types)), abundance=abundance)
@@ -591,13 +588,9 @@ class ConsumerResourceSystem():
             mutant_params = self.mutant_set.get_dynamics_params(self.type_set.get_mutant_indices(type_idx))
             type_params['traits']                = np.concatenate([type_params['traits'], mutant_params['traits']])
             type_params['consumption_rate']      = utils.SystemParameter.combine(type_params['consumption_rate'], mutant_params['consumption_rate']).values()
-            # type_params['consumption_rate']      = np.concatenate([type_params['consumption_rate'], mutant_params['consumption_rate']]) if type_params['consumption_rate'].ndim == 2 else type_params['consumption_rate']
             type_params['carrying_capacity']     = utils.SystemParameter.combine(type_params['carrying_capacity'], mutant_params['carrying_capacity']).values()
-            # type_params['carrying_capacity']     = np.concatenate([type_params['carrying_capacity'], mutant_params['carrying_capacity']]) if type_params['carrying_capacity'].ndim == 2 else type_params['carrying_capacity']
-            type_params['energy_passthru']     = utils.SystemParameter.combine(type_params['energy_passthru'], mutant_params['energy_passthru']).values()
-            # params['energy_passthru']       = np.concatenate([type_params['energy_passthru'], mutant_params['energy_passthru']]) if type_params['energy_passthru'].ndim == 2 else type_params['energy_passthru']
-            type_params['growth_factor']     = utils.SystemParameter.combine(type_params['growth_factor'], mutant_params['growth_factor']).values()
-            # type_params['growth_factor']         = np.concatenate([type_params['growth_factor'], mutant_params['growth_factor']]) if type_params['growth_factor'].ndim == 2 else type_params['growth_factor']
+            type_params['energy_passthru']       = utils.SystemParameter.combine(type_params['energy_passthru'], mutant_params['energy_passthru']).values()
+            type_params['growth_factor']         = utils.SystemParameter.combine(type_params['growth_factor'], mutant_params['growth_factor']).values()
             type_params['energy_costs']          = np.concatenate([type_params['energy_costs'], mutant_params['energy_costs']])
             type_params['num_mutants']           = mutant_params['num_types']
             type_params['mutant_rates']          = mutant_params['creation_rate']
@@ -629,9 +622,7 @@ class ConsumerResourceSystem():
         #----------------------------------
         resource_params = self.resource_set.get_dynamics_params()
         #----------------------------------
-        # TODO Is this the best way to handle this line?
         consumption_rates_bytrait = np.einsum('ij,ij->ij', type_params['traits'], type_params['consumption_rate']) if type_params['consumption_rate'].ndim == 2 else np.einsum('ij,j->ij', type_params['traits'], type_params['consumption_rate'])
-        # consumption_rates_bytrait = np.einsum('ij,ij->ij', type_params['traits'], type_params['consumption_rate']) if type_params['consumption_rate'].ndim == 2 else np.einsum('ij,j->ij', type_params['traits'], type_params['consumption_rate'])
         # ------------------
         uptake_coeffs = consumption_rates_bytrait
         if(self.resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
@@ -769,8 +760,7 @@ class ConsumerResourceSystem():
             else:
                 # The added type is not present in the current population:
                 # Add the new type to the population at its abundance in the added_system:
-                self.add_type(comb_type, abundance=comb_type_abundance,
-                              parent_index=None)  # note that parent_index is None here under assumption that parent indices need to be reset in combined systems
+                self.add_type(comb_type, abundance=comb_type_abundance)#, parent_index=None)  # note that parent_index is None here under assumption that parent indices need to be reset in combined systems
             #----------------------------------
         return self
 

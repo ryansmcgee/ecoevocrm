@@ -100,8 +100,6 @@ class SystemParameter():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
     def values(self, force_type_dim=False, force_trait_dim=False):
         if(self.ndim == 0):  # scalar
             if(force_type_dim and force_trait_dim):
@@ -135,19 +133,6 @@ class SystemParameter():
             return type_values
         else:
             return SystemParameter(values=type_values, num_types=len(type_idx), num_traits=self.num_traits, force_type_dim=self.force_type_dim, force_trait_dim=self.force_trait_dim)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # def get_type_values(self, type):
-    #     type_idx  = treat_as_list(type)
-    #     # - - - -
-    #     if(self.has_type_dim):
-    #         if(len(type_idx) == 1):
-    #             return self.values()[type_idx].ravel()
-    #         else:
-    #             return self.values()[type_idx]
-    #     else:
-    #         return self.values()
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

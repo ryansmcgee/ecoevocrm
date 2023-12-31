@@ -56,21 +56,23 @@ class TypeSet():
         #----------------------------------
         # Initialize parameter vectors/matrices:
         #----------------------------------
-        self._consumption_rate    = consumption_rate if isinstance(consumption_rate, utils.SystemParameter) else utils.SystemParameter(values=consumption_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
-        self._carrying_capacity   = carrying_capacity if isinstance(carrying_capacity, utils.SystemParameter) else utils.SystemParameter(values=carrying_capacity, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
-        self._energy_passthru     = energy_passthru if isinstance(energy_passthru, utils.SystemParameter) else utils.SystemParameter(values=energy_passthru, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
-        self._growth_factor       = growth_factor if isinstance(growth_factor, utils.SystemParameter) else utils.SystemParameter(values=growth_factor, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False)
-        self._cost_baseline       = cost_baseline if isinstance(cost_baseline, utils.SystemParameter) else utils.SystemParameter(values=cost_baseline, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False)
-        self._cost_trait          = cost_trait if (cost_trait is None or isinstance(cost_trait, utils.SystemParameter)) else utils.SystemParameter(values=cost_trait, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False)
+        self._params = {
+            'consumption_rate':    consumption_rate if isinstance(consumption_rate, utils.SystemParameter) else utils.SystemParameter(values=consumption_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'carrying_capacity':   carrying_capacity if isinstance(carrying_capacity, utils.SystemParameter) else utils.SystemParameter(values=carrying_capacity, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'energy_passthru':     energy_passthru if isinstance(energy_passthru, utils.SystemParameter) else utils.SystemParameter(values=energy_passthru, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'growth_factor':       growth_factor if isinstance(growth_factor, utils.SystemParameter) else utils.SystemParameter(values=growth_factor, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
+            'cost_baseline':       cost_baseline if isinstance(cost_baseline, utils.SystemParameter) else utils.SystemParameter(values=cost_baseline, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
+            'cost_trait':          cost_trait if (cost_trait is None or isinstance(cost_trait, utils.SystemParameter)) else utils.SystemParameter(values=cost_trait, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
+            'mutation_rate':       mutation_rate if isinstance(mutation_rate, utils.SystemParameter) else utils.SystemParameter(values=mutation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'segregation_rate':    segregation_rate if isinstance(segregation_rate, utils.SystemParameter) else utils.SystemParameter(values=segregation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'transfer_donor_rate': transfer_donor_rate if isinstance(transfer_donor_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_donor_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'transfer_recip_rate': transfer_recip_rate if isinstance(transfer_recip_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_recip_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+        }
+
         self._cost_interaction    = utils.reshape(cost_interaction, shape=(self.num_traits, self.num_traits)) if cost_interaction is not None else None
         self._cost_landscape      = cost_landscape
-        self._mutation_rate       = mutation_rate if isinstance(mutation_rate, utils.SystemParameter) else utils.SystemParameter(values=mutation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
-        self._segregation_rate    = segregation_rate if isinstance(segregation_rate, utils.SystemParameter) else utils.SystemParameter(values=segregation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
-        self._transfer_donor_rate = transfer_donor_rate if isinstance(transfer_donor_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_donor_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
-        self._transfer_recip_rate = transfer_recip_rate if isinstance(transfer_recip_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_recip_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True)
         self._segregation_linkage = segregation_linkage
         self._transfer_linkage    = transfer_linkage
-
         self._creation_rate       = utils.treat_as_list(creation_rate) if creation_rate is not None else None # [None for i in range(self.num_types)]
 
         #----------------------------------
@@ -83,7 +85,7 @@ class TypeSet():
         self._transconjugant_indices = None
 
         self._lineageIDs = lineageIDs
-        self.phylogeny = {}
+        self.phylogeny   = {}
 
         self._energy_costs = None
         self.binarize_trait_costs = binarize_trait_costs
@@ -105,27 +107,27 @@ class TypeSet():
 
     @property
     def consumption_rate(self):
-        return self._consumption_rate.values()
+        return self._params['consumption_rate'].values()
 
     @property
     def carrying_capacity(self):
-        return self._consumption_rate.values()
+        return self._params['carrying_capacity'].values()
 
     @property
     def energy_passthru(self):
-        return self._energy_passthru.values()
+        return self._params['energy_passthru'].values()
 
     @property
     def growth_factor(self):
-        return self._growth_factor.values()
+        return self._params['growth_factor'].values()
 
     @property
     def cost_baseline(self):
-        return self._cost_baseline.values()
+        return self._params['cost_baseline'].values()
 
     @property
     def cost_trait(self):
-        return self._cost_trait.values()
+        return self._params['cost_trait'].values()
 
     @property
     def cost_interaction(self):
@@ -150,11 +152,12 @@ class TypeSet():
 
     @property
     def cost_baseline_bytype(self):
-        return (self.cost_baseline.ravel() if self.cost_baseline.ndim == 2 else self.cost_baseline)  # TODO can this be simplified?
+        return self._params['cost_baseline'].values()
+
     @property
     def cost_trait_bytype(self):
         _traits = self.traits if not self.binarize_trait_costs else (self.traits > 0).astype(int)
-        return np.sum(_traits * self.cost_trait, axis=1) if self._cost_trait is not None else 0
+        return np.sum(_traits * self.cost_trait, axis=1) if self._params['cost_trait'] is not None else 0
     
     @property
     def cost_interaction_bytype(self):
@@ -167,23 +170,22 @@ class TypeSet():
 
     @property
     def mutation_rate(self):
-        return self._mutation_rate.values()
+        return self._params['mutation_rate'].values()
 
     @property
     def segregation_rate(self):
-        return self._segregation_rate.values()
+        return self._params['segregation_rate'].values()
 
     @property
     def transfer_donor_rate(self):
-        return self._transfer_donor_rate.values()
+        return self._params['transfer_donor_rate'].values()
 
     @property
     def transfer_recip_rate(self):
-        return self._transfer_recip_rate.values()
+        return self._params['transfer_recip_rate'].values()
 
     @property
     def creation_rate(self):
-        # return TypeSet.get_array(self._creation_rate).ravel() if self._creation_rate is not None else None
         return np.array(self._creation_rate) if self._creation_rate is not None else None
 
     @property
@@ -228,38 +230,21 @@ class TypeSet():
     def generate_mutant_set(self, type_index=None, update_mutant_indices=True):
         type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.traits.shape[0])
         #----------------------------------
-        traits_mut              = []
-        consumption_rate_mut    = None
-        carrying_capacity_mut   = None
-        energy_passthru_mut     = None
-        growth_factor_mut       = None
-        cost_baseline_mut       = None
-        cost_trait_mut          = None
-        mutation_rate_mut       = None
-        segregation_rate_mut    = None
-        transfer_donor_rate_mut = None
-        transfer_recip_rate_mut = None
-        parent_indices_mut      = []
-        creation_rate_mut       = []
-        mutant_indices          = []
+        traits_mut         = []
+        params_mut         = {param: None for param in self._params.keys()}
+        parent_indices_mut = []
+        creation_rate_mut  = []
+        mutant_indices     = []
         #----------------------------------
         for p, parent_idx in enumerate(type_idx):
-            mutation_rate_p = self._mutation_rate.get_type(parent_idx, values_only=True)
+            mutation_rate_p = self._params['mutation_rate'].get_type(parent_idx, values_only=True)
             mutant_indices.append([])
             if(np.any(mutation_rate_p > 0)):
                 for i in (np.where(mutation_rate_p > 0)[0] if mutation_rate_p.ndim == 1 else range(self.traits.shape[1])):
                     traits_mut.append(self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])])
                     # - - - - -
-                    consumption_rate_mut    = utils.SystemParameter.combine(consumption_rate_mut, self._consumption_rate.get_type(parent_idx))
-                    carrying_capacity_mut   = utils.SystemParameter.combine(carrying_capacity_mut, self._carrying_capacity.get_type(parent_idx))
-                    energy_passthru_mut     = utils.SystemParameter.combine(energy_passthru_mut, self._energy_passthru.get_type(parent_idx))
-                    growth_factor_mut       = utils.SystemParameter.combine(growth_factor_mut, self._growth_factor.get_type(parent_idx))
-                    cost_baseline_mut       = utils.SystemParameter.combine(cost_baseline_mut, self._cost_baseline.get_type(parent_idx))
-                    cost_trait_mut          = utils.SystemParameter.combine(cost_trait_mut, self._cost_trait.get_type(parent_idx))
-                    mutation_rate_mut       = utils.SystemParameter.combine(mutation_rate_mut, self._mutation_rate.get_type(parent_idx))
-                    segregation_rate_mut    = utils.SystemParameter.combine(segregation_rate_mut, self._segregation_rate.get_type(parent_idx))
-                    transfer_donor_rate_mut = utils.SystemParameter.combine(transfer_donor_rate_mut, self._transfer_donor_rate.get_type(parent_idx))
-                    transfer_recip_rate_mut = utils.SystemParameter.combine(transfer_recip_rate_mut, self._transfer_recip_rate.get_type(parent_idx))
+                    for param, param_vals in params_mut.items():
+                        params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
                     # - - - - -
                     creation_rate_mut.append(mutation_rate_p[i] if mutation_rate_p.ndim == 1 else mutation_rate_p)
                     # - - - - -
@@ -267,9 +252,9 @@ class TypeSet():
                     # - - - - -
                     mutant_indices[p].append(len(traits_mut)-1)
         #----------------------------------
-        mutant_set = TypeSet(traits=traits_mut, consumption_rate=consumption_rate_mut, carrying_capacity=carrying_capacity_mut, energy_passthru=energy_passthru_mut, growth_factor=growth_factor_mut,
-                             cost_baseline=cost_baseline_mut, cost_trait=cost_trait_mut, cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
-                             mutation_rate=mutation_rate_mut, segregation_rate=segregation_rate_mut, transfer_donor_rate=transfer_donor_rate_mut, transfer_recip_rate=transfer_recip_rate_mut,
+        mutant_set = TypeSet(traits=traits_mut, consumption_rate=params_mut['consumption_rate'], carrying_capacity=params_mut['carrying_capacity'], energy_passthru=params_mut['energy_passthru'], growth_factor=params_mut['growth_factor'],
+                             cost_baseline=params_mut['cost_baseline'], cost_trait=params_mut['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
+                             mutation_rate=params_mut['mutation_rate'], segregation_rate=params_mut['segregation_rate'], transfer_donor_rate=params_mut['transfer_donor_rate'], transfer_recip_rate=params_mut['transfer_recip_rate'],
                              creation_rate=creation_rate_mut, parent_indices=parent_indices_mut, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
         if(update_mutant_indices):
@@ -282,23 +267,14 @@ class TypeSet():
     def generate_segregant_set(self, type_index=None, update_segregant_indices=True):
         type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.traits.shape[0])
         #----------------------------------
-        traits_seg              = []
-        consumption_rate_seg    = None
-        carrying_capacity_seg   = None
-        energy_passthru_seg     = None
-        growth_factor_seg       = None
-        cost_baseline_seg       = None
-        cost_trait_seg          = None
-        mutation_rate_seg       = None
-        segregation_rate_seg    = None
-        transfer_donor_rate_seg = None
-        transfer_recip_rate_seg = None
-        parent_indices_seg      = []
-        creation_rate_seg       = []
-        segregant_indices       = []
+        traits_seg         = []
+        params_seg         = {param: None for param in self._params.keys()}
+        parent_indices_seg = []
+        creation_rate_seg  = []
+        segregant_indices  = []
         #----------------------------------
         for p, parent_idx in enumerate(type_idx):
-            segregation_rate_p = self._segregation_rate.get_type(parent_idx, values_only=True)
+            segregation_rate_p = self._params['segregation_rate'].get_type(parent_idx, values_only=True)
             segregant_indices.append([])
             if(np.any(segregation_rate_p > 0)):
                 for i in (np.where(segregation_rate_p > 0)[0] if segregation_rate_p.ndim == 1 else range(self.traits.shape[1])):
@@ -309,16 +285,8 @@ class TypeSet():
                             _traits_seg[self._segregation_linkage[i]] = 0
                         traits_seg.append(_traits_seg)
                         # - - - - -
-                        consumption_rate_seg = utils.SystemParameter.combine(consumption_rate_seg, self._consumption_rate.get_type(parent_idx))
-                        carrying_capacity_seg = utils.SystemParameter.combine(carrying_capacity_seg, self._carrying_capacity.get_type(parent_idx))
-                        energy_passthru_seg = utils.SystemParameter.combine(energy_passthru_seg, self._energy_passthru.get_type(parent_idx))
-                        growth_factor_seg = utils.SystemParameter.combine(growth_factor_seg, self._growth_factor.get_type(parent_idx))
-                        cost_baseline_seg = utils.SystemParameter.combine(cost_baseline_seg, self._cost_baseline.get_type(parent_idx))
-                        cost_trait_seg = utils.SystemParameter.combine(cost_trait_seg, self._cost_trait.get_type(parent_idx))
-                        mutation_rate_seg = utils.SystemParameter.combine(mutation_rate_seg, self._mutation_rate.get_type(parent_idx))
-                        segregation_rate_seg = utils.SystemParameter.combine(segregation_rate_seg, self._segregation_rate.get_type(parent_idx))
-                        transfer_donor_rate_seg = utils.SystemParameter.combine(transfer_donor_rate_seg, self._transfer_donor_rate.get_type(parent_idx))
-                        transfer_recip_rate_seg = utils.SystemParameter.combine(transfer_recip_rate_seg, self._transfer_recip_rate.get_type(parent_idx))
+                        for param, param_vals in params_seg.items():
+                            params_seg[param] = utils.SystemParameter.combine(params_seg[param], self._params[param].get_type(parent_idx))
                         # - - - - -
                         creation_rate_seg.append(segregation_rate_p[i] if segregation_rate_p.ndim == 1 else segregation_rate_p)
                         # - - - - -
@@ -326,10 +294,10 @@ class TypeSet():
                         # - - - - -
                         segregant_indices[p].append(len(traits_seg)-1)
         #----------------------------------
-        segregant_set = TypeSet(traits=traits_seg, consumption_rate=consumption_rate_seg, carrying_capacity=carrying_capacity_seg, energy_passthru=energy_passthru_seg, growth_factor=growth_factor_seg,
-                                 cost_baseline=cost_baseline_seg, cost_trait=cost_trait_seg, cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
-                                 mutation_rate=mutation_rate_seg, segregation_rate=segregation_rate_seg, transfer_donor_rate=transfer_donor_rate_seg, transfer_recip_rate=transfer_recip_rate_seg,
-                                 creation_rate=creation_rate_seg, parent_indices=parent_indices_seg, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
+        segregant_set = TypeSet(traits=traits_seg, consumption_rate=params_seg['consumption_rate'], carrying_capacity=params_seg['carrying_capacity'], energy_passthru=params_seg['energy_passthru'], growth_factor=params_seg['growth_factor'],
+                                cost_baseline=params_seg['cost_baseline'], cost_trait=params_seg['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
+                                mutation_rate=params_seg['mutation_rate'], segregation_rate=params_seg['segregation_rate'], transfer_donor_rate=params_seg['transfer_donor_rate'], transfer_recip_rate=params_seg['transfer_recip_rate'],
+                                creation_rate=creation_rate_seg, parent_indices=parent_indices_seg, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
         if(update_segregant_indices):
             self._segregant_indices = segregant_indices
@@ -338,33 +306,10 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, type_set=None, traits=None, consumption_rate=None, carrying_capacity=None, energy_passthru=None, growth_factor=None, cost_baseline=None, cost_trait=None,
-                 mutation_rate=None, segregation_rate=None, transfer_donor_rate=None, transfer_recip_rate=None, creation_rate=None,
-                 parent_index=None, parent_id=None, ref_type_idx=None):
-        parent_idx   = np.where(self.typeIDs==parent_id)[0] if parent_id is not None else parent_index
-        ref_type_idx = ref_type_idx if ref_type_idx is not None else parent_idx if parent_idx is not None else 0
+    def add_type(self, added_type_set):
+        if(not isinstance(added_type_set, TypeSet)):
+            utils.error(f"Error in TypeSet add_type(): type_set argument expects object of TypeSet type.")
         #----------------------------------
-        added_type_set = None
-        if(type_set is not None):
-            if(isinstance(type_set, TypeSet)):
-                added_type_set = type_set
-            else:
-                utils.error(f"Error in TypeSet add_type(): type_set argument expects object of TypeSet type.")
-        else:
-            # TODO: Why do we create this TypeSet? Is it just to preprocess all of the passed-in parameter values? If so, we can skip making this TypeSet and just handle SystemParameter objs for the param values.
-            added_type_set = TypeSet(traits=traits if traits is not None else self.traits[ref_type_idx],
-                                         consumption_rate=consumption_rate if consumption_rate is not None else self._consumption_rate.get_type(ref_type_idx), # TODO I'm not sure this is the right thing to do, should we even be creating this added TypeSet?
-                                         carrying_capacity=carrying_capacity if carrying_capacity is not None else self._carrying_capacity.get_type(ref_type_idx),
-                                         energy_passthru=energy_passthru if energy_passthru is not None else self._energy_passthru.get_type(ref_type_idx),
-                                         growth_factor=growth_factor if growth_factor is not None else self._growth_factor.get_type(ref_type_idx),
-                                         cost_baseline=cost_baseline if cost_baseline is not None else self._cost_baseline.get_type(ref_type_idx),
-                                         cost_trait=cost_trait if cost_trait is not None else self._cost_trait.get_type(ref_type_idx),
-                                         mutation_rate=mutation_rate if mutation_rate is not None else self._mutation_rate.get_type(ref_type_idx),
-                                         segregation_rate=segregation_rate if segregation_rate is not None else self._segregation_rate.get_type(ref_type_idx),
-                                         transfer_donor_rate=transfer_donor_rate if transfer_donor_rate is not None else self._transfer_donor_rate.get_type(ref_type_idx),
-                                         transfer_recip_rate=transfer_recip_rate if transfer_recip_rate is not None else self._transfer_recip_rate.get_type(ref_type_idx),
-                                         creation_rate=creation_rate if creation_rate is not None else self.creation_rate[ref_type_idx],
-                                     )
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != added_type_set.num_traits): 
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({added_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
@@ -372,16 +317,8 @@ class TypeSet():
         added_type_indices = list(range(self.num_types, self.num_types+added_type_set.num_types))
         #----------------------------------
         self._traits = self._traits.add(added_type_set.traits)
-        self._consumption_rate    = utils.SystemParameter.combine(self._consumption_rate, added_type_set._consumption_rate) # TODO: Should the 2nd arg - the added param set - be passed in as a SystemParameter or as a numpy array? Currently treating as a SystemParameter
-        self._carrying_capacity   = utils.SystemParameter.combine(self._carrying_capacity, added_type_set._carrying_capacity)
-        self._energy_passthru     = utils.SystemParameter.combine(self._energy_passthru, added_type_set._energy_passthru)
-        self._growth_factor       = utils.SystemParameter.combine(self._growth_factor, added_type_set._growth_factor)
-        self._cost_baseline       = utils.SystemParameter.combine(self._cost_baseline, added_type_set._cost_baseline)
-        self._cost_trait          = utils.SystemParameter.combine(self._cost_trait, added_type_set._cost_trait)
-        self._mutation_rate       = utils.SystemParameter.combine(self._mutation_rate, added_type_set._mutation_rate)
-        self._segregation_rate    = utils.SystemParameter.combine(self._segregation_rate, added_type_set._segregation_rate)
-        self._transfer_donor_rate = utils.SystemParameter.combine(self._transfer_donor_rate, added_type_set._transfer_donor_rate)
-        self._transfer_recip_rate = utils.SystemParameter.combine(self._transfer_recip_rate, added_type_set._transfer_recip_rate)
+        for param, param_vals in self._params.items():
+            self._params[param] = utils.SystemParameter.combine(self._params[param], added_type_set._params[param])
         #----------------------------------
         self._creation_rate = [rate for ratelist in [self._creation_rate, added_type_set._creation_rate] for rate in ratelist] if self._creation_rate is not None else None
         #----------------------------------
@@ -441,7 +378,6 @@ class TypeSet():
         #----------------------------------
         return new_lineage_id
 
-
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_type(self, type_index=None):
@@ -450,18 +386,18 @@ class TypeSet():
             utils.error(f"Error in TypeSet get_type(): A type index or type id must be given.")
         #----------------------------------
         return TypeSet(traits = self.traits[type_idx],
-                        consumption_rate     = self._consumption_rate.get_type(type_idx),
-                        carrying_capacity    = self._carrying_capacity.get_type(type_idx),
-                        energy_passthru      = self._energy_passthru.get_type(type_idx),
-                        growth_factor        = self._growth_factor.get_type(type_idx),
-                        cost_baseline        = self._cost_baseline.get_type(type_idx),
-                        cost_trait           = self._cost_trait.get_type(type_idx),
+                        consumption_rate     = self._params['consumption_rate'].get_type(type_idx),
+                        carrying_capacity    = self._params['carrying_capacity'].get_type(type_idx),
+                        energy_passthru      = self._params['energy_passthru'].get_type(type_idx),
+                        growth_factor        = self._params['growth_factor'].get_type(type_idx),
+                        cost_baseline        = self._params['cost_baseline'].get_type(type_idx),
+                        cost_trait           = self._params['cost_trait'].get_type(type_idx),
                         cost_interaction     = self.cost_interaction,
                         cost_landscape       = self.cost_landscape,
-                        mutation_rate        = self._mutation_rate.get_type(type_idx),
-                        segregation_rate     = self._segregation_rate.get_type(type_idx),
-                        transfer_donor_rate  = self._transfer_donor_rate.get_type(type_idx),
-                        transfer_recip_rate  = self._transfer_recip_rate.get_type(type_idx),
+                        mutation_rate        = self._params['mutation_rate'].get_type(type_idx),
+                        segregation_rate     = self._params['segregation_rate'].get_type(type_idx),
+                        transfer_donor_rate  = self._params['transfer_donor_rate'].get_type(type_idx),
+                        transfer_recip_rate  = self._params['transfer_recip_rate'].get_type(type_idx),
                         creation_rate        = self.creation_rate[type_idx] if self.creation_rate is not None else None,
                         parent_indices       = self.parent_indices[type_idx],
                         binarize_trait_costs = self.binarize_trait_costs,
@@ -503,10 +439,10 @@ class TypeSet():
         #----------------------------------
         return { 'num_types':         len(type_idx),
                  'traits':            self.traits[type_idx],
-                 'consumption_rate':  self._consumption_rate.get_type(type_idx, values_only),
-                 'carrying_capacity': self._carrying_capacity.get_type(type_idx, values_only),
-                 'energy_passthru':   self._energy_passthru.get_type(type_idx, values_only),
-                 'growth_factor':     self._growth_factor.get_type(type_idx, values_only),
+                 'consumption_rate':  self._params['consumption_rate'].get_type(type_idx, values_only),
+                 'carrying_capacity': self._params['carrying_capacity'].get_type(type_idx, values_only),
+                 'energy_passthru':   self._params['energy_passthru'].get_type(type_idx, values_only),
+                 'growth_factor':     self._params['growth_factor'].get_type(type_idx, values_only),
                  'energy_costs':      self.energy_costs[type_idx],
                  'creation_rate':     self.creation_rate[type_idx] if self.creation_rate is not None else None,
                  'parent_indices':    self.parent_indices[type_idx] }
@@ -519,16 +455,8 @@ class TypeSet():
             utils.error("Error in TypeSet.reorder_types(): The ordering provided has fewer indices than types.")
         #----------------------------------
         self._traits                 = self._traits.reorder(type_order)
-        self._consumption_rate.reorder(type_order)
-        self._carrying_capacity.reorder(type_order)
-        self._energy_passthru.reorder(type_order)
-        self._growth_factor.reorder(type_order)
-        self._cost_baseline.reorder(type_order)
-        self._cost_trait.reorder(type_order)
-        self._mutation_rate.reorder(type_order)
-        self._segregation_rate.reorder(type_order)
-        self._transfer_donor_rate.reorder(type_order)
-        self._transfer_recip_rate.reorder(type_order)
+        for param in self._params.keys():
+            self._params[param].reorder(type_order)
         self._creation_rate          = np.array(self._creation_rate)[type_order].tolist() if self._creation_rate is not None else None
         self._energy_costs           = None # reset to recalculate upon next reference
         self._typeIDs                = np.array(self._typeIDs)[type_order].tolist() if self._typeIDs is not None else None
