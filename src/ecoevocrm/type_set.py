@@ -19,8 +19,8 @@ class TypeSet():
                        cost_trait                 = 0,
                        mutation_rate              = 1e-9,
                        segregation_rate           = 0,
-                       transfer_donor_rate        = 0,
-                       transfer_recip_rate        = 0,
+                       transfer_rate_donor        = 0,
+                       transfer_rate_recip        = 0,
 
                        cost_interaction           = None,
                        cost_landscape             = None,
@@ -32,6 +32,8 @@ class TypeSet():
                        segregation_linkage        = None,
                        transfer_linkage           = None,
                        parent_indices             = None,
+                       donor_indices              = None,
+                       recip_indices              = None,
                        lineageIDs                 = None,
                        binarize_trait_costs       = True,
                        binarize_interaction_costs = True ):
@@ -69,8 +71,8 @@ class TypeSet():
             'cost_trait':          cost_trait if (cost_trait is None or isinstance(cost_trait, utils.SystemParameter)) else utils.SystemParameter(values=cost_trait, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
             'mutation_rate':       mutation_rate if isinstance(mutation_rate, utils.SystemParameter) else utils.SystemParameter(values=mutation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
             'segregation_rate':    segregation_rate if isinstance(segregation_rate, utils.SystemParameter) else utils.SystemParameter(values=segregation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
-            'transfer_donor_rate': transfer_donor_rate if isinstance(transfer_donor_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_donor_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
-            'transfer_recip_rate': transfer_recip_rate if isinstance(transfer_recip_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_recip_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'transfer_rate_donor': transfer_rate_donor if isinstance(transfer_rate_donor, utils.SystemParameter) else utils.SystemParameter(values=transfer_rate_donor, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
+            'transfer_rate_recip': transfer_rate_recip if isinstance(transfer_rate_recip, utils.SystemParameter) else utils.SystemParameter(values=transfer_rate_recip, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
         }
 
         self._cost_interaction         = utils.reshape(cost_interaction, shape=(self.num_traits, self.num_traits)) if cost_interaction is not None else None
@@ -84,15 +86,17 @@ class TypeSet():
         self._segregation_linkage      = segregation_linkage
         self._transfer_linkage         = transfer_linkage
 
-
         #----------------------------------
         # Initialize other type properties/metadata:
         #----------------------------------
-        self._typeIDs                = None
-        self._parent_indices         = utils.treat_as_list(parent_indices) if parent_indices is not None else [None for i in range(self.num_types)]
-        self._mutant_indices         = None
-        self._segregant_indices      = None
-        self._transconjugant_indices = None
+        self._typeIDs                        = None
+        self._parent_indices                 = utils.treat_as_list(parent_indices) if parent_indices is not None else [None for i in range(self.num_types)]
+        self._donor_indices                  = utils.treat_as_list(donor_indices) if donor_indices is not None else [None for i in range(self.num_types)]
+        self._recip_indices                  = utils.treat_as_list(recip_indices) if recip_indices is not None else [None for i in range(self.num_types)]
+        self._mutant_indices                 = None
+        self._segregant_indices              = None
+        self._transconjugant_indices_bydonor = None
+        self._transconjugant_indices_byrecip = None
 
         self._lineageIDs = lineageIDs
         self.phylogeny   = {}
@@ -187,12 +191,12 @@ class TypeSet():
         return self._params['segregation_rate'].values()
 
     @property
-    def transfer_donor_rate(self):
-        return self._params['transfer_donor_rate'].values()
+    def transfer_rate_donor(self):
+        return self._params['transfer_rate_donor'].values()
 
     @property
-    def transfer_recip_rate(self):
-        return self._params['transfer_recip_rate'].values()
+    def transfer_rate_recip(self):
+        return self._params['transfer_rate_recip'].values()
 
     @property
     def creation_rate(self):
@@ -203,10 +207,6 @@ class TypeSet():
         if(self._typeIDs is None):
             self._typeIDs = np.array(self.assign_type_ids())
         return self._typeIDs
-
-    # @property
-    # def trait_keys(self):
-    #     return [''.join(str(a) for a in traits_u) for traits_u in (self.traits != 0).astype(int)]
 
     def get_trait_key(self, traits):
         _traits = np.array(traits)
@@ -226,6 +226,14 @@ class TypeSet():
         return np.array(self._parent_indices)
 
     @property
+    def donor_indices(self):
+        return np.array(self._donor_indices)
+
+    @property
+    def recip_indices(self):
+        return np.array(self._recip_indices)
+
+    @property
     def mutant_indices(self):
         return self._mutant_indices
 
@@ -234,8 +242,12 @@ class TypeSet():
         return self._segregant_indices
 
     @property
-    def transconjugant_indices(self):
-        return self._transconjugant_indices
+    def transconjugant_indices_bydonor(self):
+        return self._transconjugant_indices_bydonor
+
+    @property
+    def transconjugant_indices_byrecip(self):
+        return self._transconjugant_indices_byrecip
 
     @property
     def lineageIDs(self):
@@ -260,33 +272,10 @@ class TypeSet():
         mutant_indices     = []
         #----------------------------------
         for p, parent_idx in enumerate(type_idx):
-            mutation_rate_p = self._params['mutation_rate'].get_type(parent_idx, values_only=True)
+            mutation_rate_par = self._params['mutation_rate'].get_type(parent_idx, values_only=True)
             mutant_indices.append([])
-            if(np.any(mutation_rate_p > 0)):
-                for i in (np.where(mutation_rate_p > 0)[0] if mutation_rate_p.ndim == 1 else range(self.traits.shape[1])):
-                    # traits_mut.append(self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])])
-                    # # - - - - -
-                    # for param, param_vals in params_mut.items():
-                    #     params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
-                    # - - - - -
-                    # mutant_attributes_p = {}
-                    # if(self.mutant_attributes is not None):
-                    #     for key in self.mutant_attributes.keys():
-                    #         if(re.match(key, self.trait_keys[parent_idx])):
-                    #             mutant_attributes_p = self.mutant_attributes[key]
-                    #             break
-                    # # - - - - -
-                    # if('traits' in mutant_attributes_p):
-                    #     _traits_mut = mutant_attributes_p['traits']
-                    # else:
-                    #     _traits_mut = self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])]
-                    # traits_mut.append(_traits_mut)
-                    # # - - - - -
-                    # for param, param_vals in params_mut.items():
-                    #     if(param in mutant_attributes_p):
-                    #         params_mut[param] = utils.SystemParameter.combine(params_mut[param], utils.SystemParameter(mutant_attributes_p[param], num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
-                    #     else:
-                    #         params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
+            if(np.any(mutation_rate_par > 0)): # TODO I think this if is redundant with the where below (where returns empty list if none meet criteria)
+                for i in (np.where(mutation_rate_par > 0)[0] if mutation_rate_par.ndim == 1 else range(self.traits.shape[1])):
                     # - - - - -
                     # Generate the (default) mutant trait profile:
                     _traits_mut = self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])]
@@ -298,7 +287,7 @@ class TypeSet():
                             if(re.match(key, self.get_trait_key(_traits_mut))):
                                 mutant_attributes_mut = self.mutant_attributes[key]
                                 break
-                    # ...overriding the default mutant trait profile, if applicable:
+                    #...overriding the default mutant trait profile, if applicable:
                     if('traits' in mutant_attributes_mut):
                         _traits_mut = mutant_attributes_mut['traits']
                     # Append the mutant trait profile to the list of mutant traits:
@@ -310,7 +299,7 @@ class TypeSet():
                         else:
                             params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
                     # - - - - -
-                    creation_rate_mut.append(mutation_rate_p[i] if mutation_rate_p.ndim == 1 else mutation_rate_p)
+                    creation_rate_mut.append(mutation_rate_par[i] if mutation_rate_par.ndim == 1 else mutation_rate_par)
                     # - - - - -
                     parent_indices_mut.append(parent_idx)
                     # - - - - -
@@ -318,7 +307,7 @@ class TypeSet():
         #----------------------------------
         mutant_set = TypeSet(traits=traits_mut, consumption_rate=params_mut['consumption_rate'], carrying_capacity=params_mut['carrying_capacity'], energy_passthru=params_mut['energy_passthru'], growth_factor=params_mut['growth_factor'],
                              cost_baseline=params_mut['cost_baseline'], cost_trait=params_mut['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
-                             mutation_rate=params_mut['mutation_rate'], segregation_rate=params_mut['segregation_rate'], transfer_donor_rate=params_mut['transfer_donor_rate'], transfer_recip_rate=params_mut['transfer_recip_rate'],
+                             mutation_rate=params_mut['mutation_rate'], segregation_rate=params_mut['segregation_rate'], transfer_rate_donor=params_mut['transfer_rate_donor'], transfer_rate_recip=params_mut['transfer_rate_recip'],
                              mutant_attributes=self.mutant_attributes, segregant_attributes=self.segregant_attributes, transconjugant_attributes=self.transconjugant_attributes,
                              creation_rate=creation_rate_mut, parent_indices=parent_indices_mut, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
@@ -339,33 +328,11 @@ class TypeSet():
         segregant_indices  = []
         #----------------------------------
         for p, parent_idx in enumerate(type_idx):
-            segregation_rate_p = self._params['segregation_rate'].get_type(parent_idx, values_only=True)
+            segregation_rate_par = self._params['segregation_rate'].get_type(parent_idx, values_only=True)
             segregant_indices.append([])
-            if(np.any(segregation_rate_p > 0)):
-                for i in (np.where(segregation_rate_p > 0)[0] if segregation_rate_p.ndim == 1 else range(self.traits.shape[1])):
+            if(np.any(segregation_rate_par > 0)): # TODO I think this if is redundant with the where below (where returns empty list if none meet criteria)
+                for i in (np.where(segregation_rate_par > 0)[0] if segregation_rate_par.ndim == 1 else range(self.traits.shape[1])):
                     if(self.traits[parent_idx][i] != 0):
-                        # - - - - -
-                        # segregant_attributes_p = {}
-                        # if(self.segregant_attributes is not None):
-                        #     for key in self.segregant_attributes.keys():
-                        #         if(re.match(key, self.trait_keys[parent_idx])):
-                        #             segregant_attributes_p = self.segregant_attributes[key]
-                        #             break
-                        # # - - - - -
-                        # if('traits' in segregant_attributes_p):
-                        #     _traits_seg = segregant_attributes_p['traits']
-                        # else:
-                        #     _traits_seg = self.traits[parent_idx].copy()
-                        #     _traits_seg[i] = 0
-                        #     if(self._segregation_linkage is not None and i in self._segregation_linkage):
-                        #         _traits_seg[self._segregation_linkage[i]] = 0
-                        # traits_seg.append(_traits_seg)
-                        # # - - - - -
-                        # for param, param_vals in params_seg.items():
-                        #     if(param in segregant_attributes_p):
-                        #         params_seg[param] = utils.SystemParameter.combine(params_seg[param], utils.SystemParameter(segregant_attributes_p[param], num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
-                        #     else:
-                        #         params_seg[param] = utils.SystemParameter.combine(params_seg[param], self._params[param].get_type(parent_idx))
                         # - - - - -
                         # Generate the (default) segregant trait profile:
                         _traits_seg = self.traits[parent_idx].copy()
@@ -380,7 +347,7 @@ class TypeSet():
                                 if(re.match(key, self.get_trait_key(_traits_seg))):
                                     segregant_attributes_seg = self.segregant_attributes[key]
                                     break
-                        # ...overriding the default segregant trait profile, if applicable:
+                        #...overriding the default segregant trait profile, if applicable:
                         if('traits' in segregant_attributes_seg):
                             _traits_seg = segregant_attributes_seg['traits']
                         # Append the segregant trait profile to the list of segregant traits:
@@ -392,7 +359,7 @@ class TypeSet():
                             else:
                                 params_seg[param] = utils.SystemParameter.combine(params_seg[param], self._params[param].get_type(parent_idx))
                         # - - - - -
-                        creation_rate_seg.append(segregation_rate_p[i] if segregation_rate_p.ndim == 1 else segregation_rate_p)
+                        creation_rate_seg.append(segregation_rate_par[i] if segregation_rate_par.ndim == 1 else segregation_rate_par)
                         # - - - - -
                         parent_indices_seg.append(parent_idx)
                         # - - - - -
@@ -400,7 +367,7 @@ class TypeSet():
         #----------------------------------
         segregant_set = TypeSet(traits=traits_seg, consumption_rate=params_seg['consumption_rate'], carrying_capacity=params_seg['carrying_capacity'], energy_passthru=params_seg['energy_passthru'], growth_factor=params_seg['growth_factor'],
                                 cost_baseline=params_seg['cost_baseline'], cost_trait=params_seg['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
-                                mutation_rate=params_seg['mutation_rate'], segregation_rate=params_seg['segregation_rate'], transfer_donor_rate=params_seg['transfer_donor_rate'], transfer_recip_rate=params_seg['transfer_recip_rate'],
+                                mutation_rate=params_seg['mutation_rate'], segregation_rate=params_seg['segregation_rate'], transfer_rate_donor=params_seg['transfer_rate_donor'], transfer_rate_recip=params_seg['transfer_rate_recip'],
                                 mutant_attributes=self.mutant_attributes, segregant_attributes=self.segregant_attributes, transconjugant_attributes=self.transconjugant_attributes,
                                 creation_rate=creation_rate_seg, parent_indices=parent_indices_seg, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
@@ -408,6 +375,85 @@ class TypeSet():
             self._segregant_indices = segregant_indices
         #----------------------------------
         return segregant_set
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def generate_transconjugant_set(self, donor_index=None, recip_index=None, update_transconjugant_indices=True):
+        donor_indices = utils.treat_as_list(donor_index) if donor_index is not None else range(self.traits.shape[0])
+        recip_indices = utils.treat_as_list(recip_index) if recip_index is not None else range(self.traits.shape[0])
+        #----------------------------------
+        traits_xconj           = []
+        params_xconj           = {param: None for param in self._params.keys()}
+        creation_rate_xconj    = []
+        donor_indices_xconj    = []
+        recip_indices_xconj    = []
+        transconjugant_indices_bydonor = [[] for d in range(len(donor_indices))]
+        transconjugant_indices_byrecip = [[] for r in range(len(recip_indices))]
+        #----------------------------------
+        # Iterate over potential donor types:
+        for d, donor_idx in enumerate(donor_indices):
+            transfer_rate_donor = self._params['transfer_rate_donor'].get_type(donor_idx, values_only=True)
+            for i in (np.where(transfer_rate_donor > 0)[0] if transfer_rate_donor.ndim == 1 else range(self.traits.shape[1])):
+                if(self.traits[donor_idx][i] != 0):
+                    # Iterate over potential recipient types:
+                    for r, recip_idx in enumerate(recip_indices):
+                        transfer_rate_recip   = self._params['transfer_rate_recip'].get_type(recip_idx, values_only=True)
+                        transfer_rate_recip_i = transfer_rate_recip[i] if transfer_rate_recip.ndim == 1 else transfer_rate_recip
+                        if(self.traits[recip_idx][i] == 0 and transfer_rate_recip_i > 0):
+                            # - - - - -
+                            transferred_traits = [i]
+                            if(self._transfer_linkage is not None and i in self._transfer_linkage):
+                                transferred_traits = np.concatenate([transferred_traits, self._transfer_linkage[i]])
+                            # - - - - -
+                            # Generate the (default) transconjugant trait profile:
+                            _traits_xconj = self.traits[recip_idx].copy()
+                            _traits_xconj[transferred_traits] = self.traits[donor_idx][transferred_traits]
+                            # - - - - -
+                            # Check if attributes have been manually specified for this transconjugant trait profile...
+                            transconjugant_attributes_xconj = {}
+                            if(self.transconjugant_attributes is not None):
+                                for key in self.transconjugant_attributes.keys():
+                                    if(re.match(key, self.get_trait_key(_traits_xconj))):
+                                        transconjugant_attributes_xconj = self.transconjugant_attributes[key]
+                                        break
+                            # Override the default transconjugant trait profile if applicable:
+                            if('traits' in transconjugant_attributes_xconj):
+                                override_traits = transconjugant_attributes_xconj['traits']['traits'] if 'traits' in transconjugant_attributes_xconj['traits'] else range(self.traits.shape[1])
+                                _traits_xconj[override_traits] = transconjugant_attributes_xconj['traits']['values']
+                            # Append the transconjugant trait profile to the list of transconjugant traits:
+                            traits_xconj.append(_traits_xconj)
+                            # - - - - -
+                            for param, param_vals in params_xconj.items():
+                                xconj_values = self._params[param].values(type=recip_idx)
+                                donor_values = self._params[param].values(type=donor_idx, trait=transferred_traits)
+                                if(xconj_values.ndim == 1):# and donor_values.ndim == 1):
+                                    xconj_values[transferred_traits] = donor_values if donor_values.ndim <= 1 else donor_values.ravel()
+                                elif(xconj_values.ndim == 2): # and donor_values.ndim == 2):
+                                    xconj_values = xconj_values.ravel()
+                                    xconj_values[transferred_traits] = donor_values if donor_values.ndim <= 1 else donor_values.ravel()
+                                params_xconj[param] = utils.SystemParameter.combine(params_xconj[param], utils.SystemParameter(xconj_values, num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
+                                pass
+                            # - - - - -
+                            transfer_rate_donor_i = transfer_rate_donor[i] if transfer_rate_donor.ndim == 1 else transfer_rate_donor
+                            creation_rate_xconj.append(transfer_rate_donor_i * transfer_rate_recip_i)
+                            # - - - - -
+                            donor_indices_xconj.append(donor_idx)
+                            recip_indices_xconj.append(recip_idx) # TODO This needs to be donor_indices and recip_indices
+                            # - - - - -
+                            transconjugant_indices_bydonor[d].append(len(traits_xconj)-1)
+                            transconjugant_indices_byrecip[r].append(len(traits_xconj)-1)
+        #----------------------------------
+        transconjugant_set = TypeSet(traits=traits_xconj, consumption_rate=params_xconj['consumption_rate'], carrying_capacity=params_xconj['carrying_capacity'], energy_passthru=params_xconj['energy_passthru'], growth_factor=params_xconj['growth_factor'],
+                                     cost_baseline=params_xconj['cost_baseline'], cost_trait=params_xconj['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
+                                     mutation_rate=params_xconj['mutation_rate'], segregation_rate=params_xconj['segregation_rate'], transfer_rate_donor=params_xconj['transfer_rate_donor'], transfer_rate_recip=params_xconj['transfer_rate_recip'],
+                                     mutant_attributes=self.mutant_attributes, segregant_attributes=self.segregant_attributes, transconjugant_attributes=self.transconjugant_attributes,
+                                     creation_rate=creation_rate_xconj, donor_indices=donor_indices_xconj, recip_indices=recip_indices_xconj, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
+        #----------------------------------
+        if(update_transconjugant_indices):
+            self._transconjugant_indices_bydonor = transconjugant_indices_bydonor
+            self._transconjugant_indices_byrecip = transconjugant_indices_byrecip
+        #----------------------------------
+        return transconjugant_set
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -429,9 +475,11 @@ class TypeSet():
         for param, param_vals in self._params.items():
             self._params[param] = utils.SystemParameter.combine(self._params[param], added_type_set._params[param])
         #----------------------------------
-        self._creation_rate = [rate for ratelist in [self._creation_rate, added_type_set._creation_rate] for rate in ratelist] if self._creation_rate is not None else None
+        self._creation_rate  = [rate for ratelist in [self._creation_rate, added_type_set._creation_rate] for rate in ratelist] if self._creation_rate is not None else None
         #----------------------------------
         self._parent_indices = [pidx for idxlist in [self._parent_indices, added_type_set.parent_indices] for pidx in idxlist]
+        self._donor_indices  = [didx for idxlist in [self._donor_indices, added_type_set.donor_indices] for didx in idxlist]
+        self._recip_indices  = [ridx for idxlist in [self._recip_indices, added_type_set.recip_indices] for ridx in idxlist]
         #----------------------------------
         if(self._mutant_indices is not None):
             if(added_type_set.mutant_indices is None):
@@ -445,11 +493,17 @@ class TypeSet():
             else:
                 self._segregant_indices = [sindices for indiceslist in [self._segregant_indices, added_type_set.segregant_indices] for sindices in indiceslist]
         #--------
-        if(self._transconjugant_indices is not None):
-            if(added_type_set.transconjugant_indices is None):
-                self._transconjugant_indices = [tindices for indiceslist in [self._transconjugant_indices, [[] for addedtype in range(added_type_set.num_types)]] for tindices in indiceslist]
+        if(self._transconjugant_indices_bydonor is not None):
+            if(added_type_set.transconjugant_indices_bydonor is None):
+                self._transconjugant_indices_bydonor = [tindices for indiceslist in [self._transconjugant_indices_bydonor, [[] for addedtype in range(added_type_set.num_types)]] for tindices in indiceslist]
             else:
-                self._transconjugant_indices = [tindices for indiceslist in [self._transconjugant_indices, added_type_set.transconjugant_indices] for tindices in indiceslist]
+                self._transconjugant_indices_bydonor = [tindices for indiceslist in [self._transconjugant_indices_bydonor, added_type_set.transconjugant_indices_bydonor] for tindices in indiceslist]
+        #--------
+        if(self._transconjugant_indices_byrecip is not None):
+            if(added_type_set.transconjugant_indices_byrecip is None):
+                self._transconjugant_indices_byrecip = [tindices for indiceslist in [self._transconjugant_indices_byrecip, [[] for addedtype in range(added_type_set.num_types)]] for tindices in indiceslist]
+            else:
+                self._transconjugant_indices_byrecip = [tindices for indiceslist in [self._transconjugant_indices_byrecip, added_type_set.transconjugant_indices_byrecip] for tindices in indiceslist]
         #----------------------------------
         if(self._energy_costs is not None):
             self._energy_costs.add(added_type_set.energy_costs, axis=1)
@@ -505,13 +559,15 @@ class TypeSet():
                         cost_landscape       = self.cost_landscape,
                         mutation_rate        = self._params['mutation_rate'].get_type(type_idx),
                         segregation_rate     = self._params['segregation_rate'].get_type(type_idx),
-                        transfer_donor_rate  = self._params['transfer_donor_rate'].get_type(type_idx),
-                        transfer_recip_rate  = self._params['transfer_recip_rate'].get_type(type_idx),
+                        transfer_rate_donor  = self._params['transfer_rate_donor'].get_type(type_idx),
+                        transfer_rate_recip  = self._params['transfer_rate_recip'].get_type(type_idx),
                         creation_rate        = self.creation_rate[type_idx] if self.creation_rate is not None else None,
                         mutant_attributes    = self.mutant_attributes,
                         segregant_attributes = self.segregant_attributes,
                         transconjugant_attributes = self.transconjugant_attributes,
                         parent_indices       = self.parent_indices[type_idx],
+                        donor_indices        = self.donor_indices[type_idx],
+                        recip_indices        = self.recip_indices[type_idx],
                         binarize_trait_costs = self.binarize_trait_costs,
                         binarize_interaction_costs = self.binarize_interaction_costs )
 
@@ -541,7 +597,15 @@ class TypeSet():
 
     def get_transconjugant_indices(self, type_index=None):
         type_idx = utils.treat_as_list(type_index)
-        return [x for tranIndices_u in ([self._transconjugant_indices[u] for u in type_idx]) for x in tranIndices_u]
+        transconjugant_indices_bydonor      = [x for xconjIndices_u in ([self._transconjugant_indices_bydonor[u] for u in type_idx]) for x in xconjIndices_u]
+        transconjugant_indices_byrecip      = [x for xconjIndices_u in ([self._transconjugant_indices_byrecip[u] for u in type_idx]) for x in xconjIndices_u]
+        transconjugant_indices_intersection = [x for x in transconjugant_indices_bydonor if x in frozenset(transconjugant_indices_byrecip)]
+        return transconjugant_indices_intersection
+        # TODO this will work: for each type in typeset: keep one list of transconjugants that the type creates as a donor and another list of transconjugants that the type creates as a recipient.
+       #    then get_transconjugant indices should work like this:
+       #      compile all transconjugant indices from the asdonor lists across the given list of [active]types
+       #      compile all transconjugant indices from the asrecip lists across the given list of [active]types
+       #      take the intersection of this two compiled lists. the indices that are in both compiled lists are the valid transconjugants for the given [active]types
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -557,7 +621,9 @@ class TypeSet():
                  'growth_factor':     self._params['growth_factor'].get_type(type_idx, values_only),
                  'energy_costs':      self.energy_costs[type_idx],
                  'creation_rate':     self.creation_rate[type_idx] if self.creation_rate is not None else None,
-                 'parent_indices':    self.parent_indices[type_idx] }
+                 'parent_indices':    self.parent_indices[type_idx],
+                 'donor_indices':     self.donor_indices[type_idx],
+                 'recip_indices':     self.recip_indices[type_idx] }
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -575,11 +641,16 @@ class TypeSet():
         self._lineageIDs             = np.array(self._lineageIDs)[type_order].tolist() if self._lineageIDs is not None else None
         self._mutant_indices         = [self._mutant_indices[i] for i in type_order] if self._mutant_indices is not None else None # Rows may have unequal lengths, so keep as list of lists (not 2d array)
         self._segregant_indices      = [self._segregant_indices[i] for i in type_order] if self._segregant_indices is not None else None # Rows may have unequal lengths, so keep as list of lists (not 2d array)
-        self._transconjugant_indices = [self._transconjugant_indices[i] for i in type_order] if self._transconjugant_indices is not None else None # Rows may have unequal lengths, so keep as list of lists (not 2d array)
+        self._transconjugant_indices_bydonor = [self._transconjugant_indices_bydonor[i] for i in type_order] if self._transconjugant_indices_bydonor is not None else None # Rows may have unequal lengths, so keep as list of lists (not 2d array)
+        self._transconjugant_indices_byrecip = [self._transconjugant_indices_byrecip[i] for i in type_order] if self._transconjugant_indices_byrecip is not None else None # Rows may have unequal lengths, so keep as list of lists (not 2d array)
         #----------------------------------
         # Parent indices require special handling because simply reordering the parent indices list makes the index pointers point to incorrect places relative to the reordered lists
         _parent_indices_tempreorder = np.array(self._parent_indices)[type_order].tolist()
         self._parent_indices = [np.where(type_order == pidx)[0][0] if pidx is not None else None for pidx in _parent_indices_tempreorder]
+        _donor_indices_tempreorder = np.array(self._donor_indices)[type_order].tolist()
+        self._donor_indices  = [np.where(type_order == didx)[0][0] if didx is not None else None for didx in _donor_indices_tempreorder]
+        _recip_indices_tempreorder = np.array(self._recip_indices)[type_order].tolist()
+        self._recip_indices  = [np.where(type_order == ridx)[0][0] if ridx is not None else None for ridx in _recip_indices_tempreorder]
         #----------------------------------
         return
 

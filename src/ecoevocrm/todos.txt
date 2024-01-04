@@ -1,5 +1,6 @@
 cumulate individual mutants/segregants/etc
 segregation in dN/dt
+handle lineage dict for new implementation
 plot for growth rates over time
 
 LAND VALUE TAX

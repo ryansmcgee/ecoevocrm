@@ -100,25 +100,55 @@ class SystemParameter():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def values(self, force_type_dim=False, force_trait_dim=False):
+    def values(self, type=None, trait=None, force_type_dim=False, force_trait_dim=False):
+        type_idx  = treat_as_list(type) if type is not None else range(self.num_types)
+        trait_idx = treat_as_list(trait) if trait is not None else range(self.num_traits)
+        # - - - -
         if(self.ndim == 0):  # scalar
             if(force_type_dim and force_trait_dim):
-                return np.full(shape=(self.num_types, self.num_traits), fill_value=self._values)
+                return np.full(shape=(len(type_idx), len(trait_idx)), fill_value=self._values)
             elif(force_type_dim):
-                return np.full(shape=(self.num_types,), fill_value=self._values)
+                return np.full(shape=(len(type_idx),), fill_value=self._values)
             elif(force_trait_dim):
-                return np.full(shape=(self.num_traits,), fill_value=self._values)
+                return np.full(shape=(len(trait_idx),), fill_value=self._values)
             else:
-                return self._values  # as is
+                return self._values
         elif(self.ndim == 1):  # 1d array
-            if(len(self._values) == self.num_types and force_trait_dim):
-                return np.tile(self._values.reshape(self.num_types, 1), (1, self.num_traits))
-            elif(len(self._values) == self.num_traits and force_type_dim):
-                return np.tile(self._values.reshape(1, self.num_traits), (self.num_types, 1))
+            if(len(self._values) == self.num_traits):
+                if(force_type_dim):
+                    return np.tile(self._values[trait_idx].reshape(1, len(trait_idx)), (len(type_idx), 1))
+                else:
+                    return self._values[trait_idx]
+            elif(len(self._values) == self.num_types):
+                if(force_trait_dim):
+                    return np.tile(self._values[type_idx].reshape(len([type_idx]), 1), (1, len(trait_idx)))
+                else:
+                    return self._values[type_idx]
             else:
-                return self._values  # as is
+                error(f"Error in SystemParameter.values(): shape of self._values does not match the number of types nor traits (shouldn't be allowed).")
         else:  # 2d ExpandableArray
-            return self._values.values  # as is
+            return self._values.values[type_idx][:, trait_idx]
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def set_values(self, set_values, type=None, trait=None):
+        # This function requires that the set_values match the dimensionality of the existing self._values (at least for now)
+        # This function was hastily implemented so may have errors and/or unaccounted-for cases
+        type_idx  = treat_as_list(type) if type is not None else range(self.num_types)
+        trait_idx = treat_as_list(trait) if trait is not None else range(self.num_traits)
+        # - - - -
+        if(self.ndim == 0 and set_values.ndim == 0):  # scalar
+            self._values = set_values
+        elif(self.ndim == 1 and set_values.ndim == 1):  # 1d array
+            if(len(self._values) == self.num_types):
+                self._values[type_idx] = set_values
+            elif(len(self._values) == self.num_traits):
+                self._values[trait_idx] = set_values
+        elif(self.ndim == 2 and set_values.ndim == 2):  # 2d ExpandableArray
+            self._values._arr[type_idx, trait_idx] = set_values
+        else:
+            error(f"Error in SystemParameter.set_values(): This function currently requires that set_values matches the dimensionality of the existing self._values.")
+
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
