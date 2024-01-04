@@ -1,4 +1,5 @@
 import numpy as np
+import re
 
 import ecoevocrm.utils as utils
 
@@ -6,30 +7,33 @@ import ecoevocrm.utils as utils
 
 class TypeSet():
 
-    def __init__(self, num_types            = None,
-                       num_traits           = None,
+    def __init__(self, num_types                  = None,
+                       num_traits                 = None,
 
-                       traits               = None,
-                       consumption_rate     = 1,
-                       carrying_capacity    = 1e9,
-                       growth_factor        = 1,
-                       energy_passthru      = 0,
-                       cost_baseline        = 0,
-                       cost_trait           = 0,
-                       mutation_rate        = 1e-9,
-                       segregation_rate     = 0,
-                       transfer_donor_rate  = 0,
-                       transfer_recip_rate  = 0,
+                       traits                     = None,
+                       consumption_rate           = 1,
+                       carrying_capacity          = 1e9,
+                       growth_factor              = 1,
+                       energy_passthru            = 0,
+                       cost_baseline              = 0,
+                       cost_trait                 = 0,
+                       mutation_rate              = 1e-9,
+                       segregation_rate           = 0,
+                       transfer_donor_rate        = 0,
+                       transfer_recip_rate        = 0,
 
-                       cost_interaction     = None,
-                       cost_landscape       = None,
+                       cost_interaction           = None,
+                       cost_landscape             = None,
 
-                       creation_rate        = None,
-                       segregation_linkage  = None,
-                       transfer_linkage     = None,
-                       parent_indices       = None,
-                       lineageIDs           = None,
-                       binarize_trait_costs = True,
+                       creation_rate              = None,
+                       mutant_attributes          = None,
+                       segregant_attributes       = None,
+                       transconjugant_attributes  = None,
+                       segregation_linkage        = None,
+                       transfer_linkage           = None,
+                       parent_indices             = None,
+                       lineageIDs                 = None,
+                       binarize_trait_costs       = True,
                        binarize_interaction_costs = True ):
 
         #----------------------------------
@@ -69,11 +73,17 @@ class TypeSet():
             'transfer_recip_rate': transfer_recip_rate if isinstance(transfer_recip_rate, utils.SystemParameter) else utils.SystemParameter(values=transfer_recip_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
         }
 
-        self._cost_interaction    = utils.reshape(cost_interaction, shape=(self.num_traits, self.num_traits)) if cost_interaction is not None else None
-        self._cost_landscape      = cost_landscape
-        self._segregation_linkage = segregation_linkage
-        self._transfer_linkage    = transfer_linkage
-        self._creation_rate       = utils.treat_as_list(creation_rate) if creation_rate is not None else None # [None for i in range(self.num_types)]
+        self._cost_interaction         = utils.reshape(cost_interaction, shape=(self.num_traits, self.num_traits)) if cost_interaction is not None else None
+        self._cost_landscape           = cost_landscape
+
+        self._creation_rate            = utils.treat_as_list(creation_rate) if creation_rate is not None else None # [None for i in range(self.num_types)]
+
+        self.mutant_attributes         = mutant_attributes
+        self.segregant_attributes      = segregant_attributes
+        self.transconjugant_attributes = transconjugant_attributes
+        self._segregation_linkage      = segregation_linkage
+        self._transfer_linkage         = transfer_linkage
+
 
         #----------------------------------
         # Initialize other type properties/metadata:
@@ -166,7 +176,7 @@ class TypeSet():
 
     @property
     def cost_landscape_bytype(self):
-        return [self._cost_landscape[k] for k in self.type_keys]
+        return [self._cost_landscape[k] for k in self.trait_keys]
 
     @property
     def mutation_rate(self):
@@ -194,9 +204,22 @@ class TypeSet():
             self._typeIDs = np.array(self.assign_type_ids())
         return self._typeIDs
 
+    # @property
+    # def trait_keys(self):
+    #     return [''.join(str(a) for a in traits_u) for traits_u in (self.traits != 0).astype(int)]
+
+    def get_trait_key(self, traits):
+        _traits = np.array(traits)
+        if(traits.ndim == 2):
+            trait_keys = [''.join(str(a) for a in traits_u) for traits_u in (traits != 0).astype(int)]
+            return trait_keys
+        else:
+            trait_keys = ''.join(str(a) for a in traits)
+            return trait_keys
+
     @property
-    def type_keys(self):
-        return [''.join(str(a) for a in traits_u) for traits_u in (self.traits != 0).astype(int)]
+    def trait_keys(self):
+        return self.get_trait_key(self.traits)
 
     @property
     def parent_indices(self):
@@ -241,10 +264,51 @@ class TypeSet():
             mutant_indices.append([])
             if(np.any(mutation_rate_p > 0)):
                 for i in (np.where(mutation_rate_p > 0)[0] if mutation_rate_p.ndim == 1 else range(self.traits.shape[1])):
-                    traits_mut.append(self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])])
+                    # traits_mut.append(self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])])
+                    # # - - - - -
+                    # for param, param_vals in params_mut.items():
+                    #     params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
+                    # - - - - -
+                    # mutant_attributes_p = {}
+                    # if(self.mutant_attributes is not None):
+                    #     for key in self.mutant_attributes.keys():
+                    #         if(re.match(key, self.trait_keys[parent_idx])):
+                    #             mutant_attributes_p = self.mutant_attributes[key]
+                    #             break
+                    # # - - - - -
+                    # if('traits' in mutant_attributes_p):
+                    #     _traits_mut = mutant_attributes_p['traits']
+                    # else:
+                    #     _traits_mut = self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])]
+                    # traits_mut.append(_traits_mut)
+                    # # - - - - -
+                    # for param, param_vals in params_mut.items():
+                    #     if(param in mutant_attributes_p):
+                    #         params_mut[param] = utils.SystemParameter.combine(params_mut[param], utils.SystemParameter(mutant_attributes_p[param], num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
+                    #     else:
+                    #         params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
+                    # - - - - -
+                    # Generate the (default) mutant trait profile:
+                    _traits_mut = self.traits[parent_idx] ^ [0 if j!=i else 1 for j in range(self.traits.shape[1])]
+                    # - - - - -
+                    # Check if attributes have been manually specified for this mutant trait profile...
+                    mutant_attributes_mut = {}
+                    if(self.mutant_attributes is not None):
+                        for key in self.mutant_attributes.keys():
+                            if(re.match(key, self.get_trait_key(_traits_mut))):
+                                mutant_attributes_mut = self.mutant_attributes[key]
+                                break
+                    # ...overriding the default mutant trait profile, if applicable:
+                    if('traits' in mutant_attributes_mut):
+                        _traits_mut = mutant_attributes_mut['traits']
+                    # Append the mutant trait profile to the list of mutant traits:
+                    traits_mut.append(_traits_mut)
                     # - - - - -
                     for param, param_vals in params_mut.items():
-                        params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
+                        if(param in mutant_attributes_mut):
+                            params_mut[param] = utils.SystemParameter.combine(params_mut[param], utils.SystemParameter(mutant_attributes_mut[param], num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
+                        else:
+                            params_mut[param] = utils.SystemParameter.combine(params_mut[param], self._params[param].get_type(parent_idx))
                     # - - - - -
                     creation_rate_mut.append(mutation_rate_p[i] if mutation_rate_p.ndim == 1 else mutation_rate_p)
                     # - - - - -
@@ -255,6 +319,7 @@ class TypeSet():
         mutant_set = TypeSet(traits=traits_mut, consumption_rate=params_mut['consumption_rate'], carrying_capacity=params_mut['carrying_capacity'], energy_passthru=params_mut['energy_passthru'], growth_factor=params_mut['growth_factor'],
                              cost_baseline=params_mut['cost_baseline'], cost_trait=params_mut['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
                              mutation_rate=params_mut['mutation_rate'], segregation_rate=params_mut['segregation_rate'], transfer_donor_rate=params_mut['transfer_donor_rate'], transfer_recip_rate=params_mut['transfer_recip_rate'],
+                             mutant_attributes=self.mutant_attributes, segregant_attributes=self.segregant_attributes, transconjugant_attributes=self.transconjugant_attributes,
                              creation_rate=creation_rate_mut, parent_indices=parent_indices_mut, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
         if(update_mutant_indices):
@@ -279,14 +344,53 @@ class TypeSet():
             if(np.any(segregation_rate_p > 0)):
                 for i in (np.where(segregation_rate_p > 0)[0] if segregation_rate_p.ndim == 1 else range(self.traits.shape[1])):
                     if(self.traits[parent_idx][i] != 0):
+                        # - - - - -
+                        # segregant_attributes_p = {}
+                        # if(self.segregant_attributes is not None):
+                        #     for key in self.segregant_attributes.keys():
+                        #         if(re.match(key, self.trait_keys[parent_idx])):
+                        #             segregant_attributes_p = self.segregant_attributes[key]
+                        #             break
+                        # # - - - - -
+                        # if('traits' in segregant_attributes_p):
+                        #     _traits_seg = segregant_attributes_p['traits']
+                        # else:
+                        #     _traits_seg = self.traits[parent_idx].copy()
+                        #     _traits_seg[i] = 0
+                        #     if(self._segregation_linkage is not None and i in self._segregation_linkage):
+                        #         _traits_seg[self._segregation_linkage[i]] = 0
+                        # traits_seg.append(_traits_seg)
+                        # # - - - - -
+                        # for param, param_vals in params_seg.items():
+                        #     if(param in segregant_attributes_p):
+                        #         params_seg[param] = utils.SystemParameter.combine(params_seg[param], utils.SystemParameter(segregant_attributes_p[param], num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
+                        #     else:
+                        #         params_seg[param] = utils.SystemParameter.combine(params_seg[param], self._params[param].get_type(parent_idx))
+                        # - - - - -
+                        # Generate the (default) segregant trait profile:
                         _traits_seg = self.traits[parent_idx].copy()
                         _traits_seg[i] = 0
                         if(self._segregation_linkage is not None and i in self._segregation_linkage):
                             _traits_seg[self._segregation_linkage[i]] = 0
+                        # - - - - -
+                        # Check if attributes have been manually specified for this segregant trait profile...
+                        segregant_attributes_seg = {}
+                        if(self.segregant_attributes is not None):
+                            for key in self.segregant_attributes.keys():
+                                if(re.match(key, self.get_trait_key(_traits_seg))):
+                                    segregant_attributes_seg = self.segregant_attributes[key]
+                                    break
+                        # ...overriding the default segregant trait profile, if applicable:
+                        if('traits' in segregant_attributes_seg):
+                            _traits_seg = segregant_attributes_seg['traits']
+                        # Append the segregant trait profile to the list of segregant traits:
                         traits_seg.append(_traits_seg)
                         # - - - - -
                         for param, param_vals in params_seg.items():
-                            params_seg[param] = utils.SystemParameter.combine(params_seg[param], self._params[param].get_type(parent_idx))
+                            if(param in segregant_attributes_seg):
+                                params_seg[param] = utils.SystemParameter.combine(params_seg[param], utils.SystemParameter(segregant_attributes_seg[param], num_types=1, num_traits=self._params[param].num_traits, force_type_dim=self._params[param].force_type_dim, force_trait_dim=self._params[param].force_trait_dim))
+                            else:
+                                params_seg[param] = utils.SystemParameter.combine(params_seg[param], self._params[param].get_type(parent_idx))
                         # - - - - -
                         creation_rate_seg.append(segregation_rate_p[i] if segregation_rate_p.ndim == 1 else segregation_rate_p)
                         # - - - - -
@@ -297,6 +401,7 @@ class TypeSet():
         segregant_set = TypeSet(traits=traits_seg, consumption_rate=params_seg['consumption_rate'], carrying_capacity=params_seg['carrying_capacity'], energy_passthru=params_seg['energy_passthru'], growth_factor=params_seg['growth_factor'],
                                 cost_baseline=params_seg['cost_baseline'], cost_trait=params_seg['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
                                 mutation_rate=params_seg['mutation_rate'], segregation_rate=params_seg['segregation_rate'], transfer_donor_rate=params_seg['transfer_donor_rate'], transfer_recip_rate=params_seg['transfer_recip_rate'],
+                                mutant_attributes=self.mutant_attributes, segregant_attributes=self.segregant_attributes, transconjugant_attributes=self.transconjugant_attributes,
                                 creation_rate=creation_rate_seg, parent_indices=parent_indices_seg, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
         #----------------------------------
         if(update_segregant_indices):
@@ -309,6 +414,10 @@ class TypeSet():
     def add_type(self, added_type_set):
         if(not isinstance(added_type_set, TypeSet)):
             utils.error(f"Error in TypeSet add_type(): type_set argument expects object of TypeSet type.")
+        #----------------------------------
+        if(added_type_set.num_types == 0):
+            added_type_indices = []
+            return added_type_indices
         #----------------------------------
         # Check that the type set dimensions match the system dimensions:
         if(self.num_traits != added_type_set.num_traits): 
@@ -399,6 +508,9 @@ class TypeSet():
                         transfer_donor_rate  = self._params['transfer_donor_rate'].get_type(type_idx),
                         transfer_recip_rate  = self._params['transfer_recip_rate'].get_type(type_idx),
                         creation_rate        = self.creation_rate[type_idx] if self.creation_rate is not None else None,
+                        mutant_attributes    = self.mutant_attributes,
+                        segregant_attributes = self.segregant_attributes,
+                        transconjugant_attributes = self.transconjugant_attributes,
                         parent_indices       = self.parent_indices[type_idx],
                         binarize_trait_costs = self.binarize_trait_costs,
                         binarize_interaction_costs = self.binarize_interaction_costs )
