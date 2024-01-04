@@ -16,9 +16,6 @@ class SystemParameter():
         self.force_type_dim  = force_type_dim
         self.force_trait_dim = force_trait_dim
 
-        # if(isinstance(values, SystemParameter)):
-
-
         if(not isinstance(values, (list, np.ndarray))):  # scalar
             if(force_type_dim and force_trait_dim):
                 self._values = ExpandableArray( np.full(shape=(num_types, num_traits), fill_value=values) )
@@ -430,12 +427,6 @@ def reshape(a, shape, prioritize_col_vector_if_1d=True, dtype='float64'):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# def find_first(vec, needle):
-# 	for k, val in enumerate(vec):
-# 		if val == needle:
-# 			return k
-# 	return -1
-
 # @jit(nopython=True)
 def find_first(item, vec):
     """return the index of the first occurence of item in vec"""
@@ -469,7 +460,6 @@ def error(message, trigger_exit=True):
     print("\n"+message+"\n")
     if(trigger_exit):
         sys.exit()
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

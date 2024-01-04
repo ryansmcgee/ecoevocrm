@@ -125,6 +125,67 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+def attributes_plot(type_set, ax=None, plot_traits=True, plot_consumption_rate=True, plot_mutation_rate=True, plot_segregation_rate=True, plot_transfer_rate_donor=True, plot_transfer_rate_recip=True,
+                    trait_colors=None):
+
+    ax = plt.axes() if ax is None else ax
+
+    ax.set_ylim(0, type_set.num_types)
+    ax.set_xlim(0, type_set.num_traits)
+    ax.set_aspect('equal')
+    ax.set_ylim(ax.get_ylim()[::-1])
+
+    if(plot_traits):
+        traits = type_set.traits
+        trait_colors = trait_colors if trait_colors is not None and len(trait_colors) == traits.shape[1] else ['k']*traits.shape[1]
+        for u in range(traits.shape[0]):
+            for i in range(traits.shape[1]):
+                if(traits[u, i] != 0):
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='w', facecolor=trait_colors[i]))
+
+    if(plot_consumption_rate):
+        consumption_rate = type_set._params['consumption_rate'].values(force_type_dim=True, force_trait_dim=True)
+        for u in range(consumption_rate.shape[0]):
+            for i in range(consumption_rate.shape[1]):
+                if(consumption_rate[u, i] != 0):
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='peru', facecolor='none', hatch='...', alpha=0.5))
+
+    if(plot_mutation_rate):
+        mutation_rate = type_set._params['mutation_rate'].values(force_type_dim=True, force_trait_dim=True)
+        for u in range(mutation_rate.shape[0]):
+            for i in range(mutation_rate.shape[1]):
+                if(mutation_rate[u, i] != 0):
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='limegreen', facecolor='none', hatch='---', alpha=0.5))
+
+    if(plot_segregation_rate):
+        segregation_rate = type_set._params['segregation_rate'].values(force_type_dim=True, force_trait_dim=True)
+        for u in range(segregation_rate.shape[0]):
+            for i in range(segregation_rate.shape[1]):
+                if(segregation_rate[u, i] != 0):
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='gold', facecolor='none', hatch='|||', alpha=0.5))
+
+    if(plot_transfer_rate_donor):
+        transfer_rate_donor = type_set._params['transfer_rate_donor'].values(force_type_dim=True, force_trait_dim=True)
+        for u in range(transfer_rate_donor.shape[0]):
+            for i in range(transfer_rate_donor.shape[1]):
+                if(transfer_rate_donor[u, i] != 0):
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='mediumpurple', facecolor='none', hatch='///', alpha=0.5))
+
+    if(plot_transfer_rate_recip):
+        transfer_rate_recip = type_set._params['transfer_rate_recip'].values(force_type_dim=True, force_trait_dim=True)
+        for u in range(transfer_rate_recip.shape[0]):
+            for i in range(transfer_rate_recip.shape[1]):
+                if(transfer_rate_recip[u, i] != 0):
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='orchid', facecolor='none', hatch='\\\\\\', alpha=0.5))
+
+    for u in range(traits.shape[0]):
+        for i in range(traits.shape[1]):
+            ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=2, edgecolor='w', facecolor='none'))
+
+    return
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineageIDs=True, show_phenotypes=True, annot_extinct=False,
                    type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
                    color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
