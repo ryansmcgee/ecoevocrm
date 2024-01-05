@@ -12,7 +12,7 @@ import ecoevocrm.utils as utils
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-class ConsumerResourceSystem():
+class Community():
 
     # Define Class constants:
     RESOURCE_DYNAMICS_FASTEQ = 0
@@ -42,11 +42,13 @@ class ConsumerResourceSystem():
                  segregation_rate            = 0,     # l
                  transfer_rate_donor         = 0,     # beta
                  transfer_rate_recip         = 0,     # alpha
-                 mutant_attributes           = None,
-                 segregant_attributes        = None,
-                 transconjugant_attributes   = None,
+                 mutant_overrides            = None,
+                 segregant_overrides         = None,
+                 transconjugant_overrides    = None,
                  segregation_linkage         = None,
                  transfer_linkage            = None,
+                 lineageIDs                  = None,
+                 lineageID_traits            = None,
                  # ResourceSet params:
                  influx_rate                 = 1,     # rho    | previously rho
                  decay_rate                  = 1,     # delta  | previously tau
@@ -107,8 +109,8 @@ class ConsumerResourceSystem():
                                     consumption_rate=consumption_rate, carrying_capacity=carrying_capacity, energy_passthru=energy_passthru, growth_factor=growth_factor,
                                     cost_baseline=cost_baseline, cost_trait=cost_trait, cost_interaction=cost_interaction, cost_landscape=cost_landscape,
                                     mutation_rate=mutation_rate, segregation_rate=segregation_rate, transfer_rate_donor=transfer_rate_donor, transfer_rate_recip=transfer_rate_recip,
-                                    mutant_attributes=mutant_attributes, segregant_attributes=segregant_attributes, transconjugant_attributes=transconjugant_attributes,
-                                    segregation_linkage=segregation_linkage, transfer_linkage=transfer_linkage)
+                                    mutant_overrides=mutant_overrides, segregant_overrides=segregant_overrides, transconjugant_overrides=transconjugant_overrides,
+                                    segregation_linkage=segregation_linkage, transfer_linkage=transfer_linkage, lineageIDs=lineageIDs, lineageID_traits=lineageID_traits)
         # Check that the type set dimensions match the system dimensions:
         if(system_num_types != self.type_set.num_types):
             utils.error(f"Error in ConsumerResourceSystem __init__(): Number of system types ({system_num_types}) does not match number of type set types ({self.type_set.num_types}).")
@@ -153,14 +155,14 @@ class ConsumerResourceSystem():
         self.threshold_min_abs_abundance = threshold_min_abs_abundance
         self.convergent_lineages         = convergent_lineages
 
-        self.resource_dynamics_mode = ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ if resource_dynamics_mode == 'fasteq' \
-            else ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT if resource_dynamics_mode == 'explicit' \
+        self.resource_dynamics_mode = Community.RESOURCE_DYNAMICS_FASTEQ if resource_dynamics_mode == 'fasteq' \
+            else Community.RESOURCE_DYNAMICS_EXPLICIT if resource_dynamics_mode == 'explicit' \
             else -1
 
-        self.resource_crossfeeding_mode = ConsumerResourceSystem.RESOURCE_CROSSFEEDING_NONE if np.all(
+        self.resource_crossfeeding_mode = Community.RESOURCE_CROSSFEEDING_NONE if np.all(
             self.resource_set.cross_production == 0) or np.all(self.type_set.energy_passthru == 0) \
-            else ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HOMOTYPES if self.type_set.energy_passthru.ndim == 1 \
-            else ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HETEROTYPES if self.type_set.energy_passthru.ndim == 2 \
+            else Community.RESOURCE_CROSSFEEDING_HOMOTYPES if self.type_set.energy_passthru.ndim == 1 \
+            else Community.RESOURCE_CROSSFEEDING_HETEROTYPES if self.type_set.energy_passthru.ndim == 2 \
             else -1
 
         #----------------------------------
@@ -184,7 +186,7 @@ class ConsumerResourceSystem():
 
     @property
     def N_series(self):
-        return ConsumerResourceSystem.get_array(self._N_series)
+        return Community.get_array(self._N_series)
 
     @property
     def N(self):
@@ -192,7 +194,7 @@ class ConsumerResourceSystem():
 
     @property
     def R_series(self):
-        return ConsumerResourceSystem.get_array(self._R_series)
+        return Community.get_array(self._R_series)
 
     @property
     def R(self):
@@ -200,7 +202,7 @@ class ConsumerResourceSystem():
 
     @property
     def t_series(self):
-        return ConsumerResourceSystem.get_array(self._t_series).ravel()
+        return Community.get_array(self._t_series).ravel()
 
     @property
     def t(self):
@@ -340,9 +342,9 @@ class ConsumerResourceSystem():
 
     def dynamics(self, t, variables,
                  num_types, traits, consumption_rate, carrying_capacity, energy_passthru, growth_factor, energy_costs,
-                 num_mutants, mutant_rates, mutant_parent_indices,
-                 num_segregants, segregant_rates, segregant_parent_indices,
-                 num_transconjugants, transconjugant_rates, transconjugant_donor_indices, transconjugant_recip_indices,
+                 num_mutants, mutant_rates, mutation_parent_indices,
+                 num_segregants, segregant_rates, segregation_parent_indices,
+                 num_transconjugants, transconjugant_rates, transfer_donor_indices, transfer_recip_indices,
                  num_resources, influx_rate, decay_rate, energy_content, cross_production_energy,
                  uptake_coeffs, consumption_coeffs, resource_dynamics_mode, resource_influx_mode, resource_crossfeeding_mode):
 
@@ -352,14 +354,14 @@ class ConsumerResourceSystem():
 
         #------------------------------
 
-        growth_rate = ConsumerResourceSystem.growth_rate(N_t, R_t, t, traits, consumption_rate, carrying_capacity, energy_passthru, growth_factor, energy_costs,
-                                                         influx_rate, decay_rate, energy_content, resource_dynamics_mode, resource_influx_mode, uptake_coeffs, consumption_coeffs)
+        growth_rate = Community.growth_rate(N_t, R_t, t, traits, consumption_rate, carrying_capacity, energy_passthru, growth_factor, energy_costs,
+                                            influx_rate, decay_rate, energy_content, resource_dynamics_mode, resource_influx_mode, uptake_coeffs, consumption_coeffs)
 
         dNdt = N_t[:num_types] * growth_rate[:num_types]  # only compute dNdt for extant types # TODO: Need to add segregation to dNdt
 
-        dRdt = ConsumerResourceSystem.resource_change(N_t, R_t, t, traits, consumption_rate, carrying_capacity, energy_passthru,
-                                                      influx_rate, decay_rate, cross_production_energy, resource_dynamics_mode, resource_influx_mode, resource_crossfeeding_mode,
-                                                      consumption_coeffs)
+        dRdt = Community.resource_change(N_t, R_t, t, traits, consumption_rate, carrying_capacity, energy_passthru,
+                                         influx_rate, decay_rate, cross_production_energy, resource_dynamics_mode, resource_influx_mode, resource_crossfeeding_mode,
+                                         consumption_coeffs)
 
         #------------------------------
 
@@ -371,7 +373,7 @@ class ConsumerResourceSystem():
             self.mutant_selcoeffs = self.mutant_fitnesses - mean_fitness
             self.mutant_selcoeffs[self.mutant_selcoeffs < 0] = 0
             # - - - -
-            self.mutation_propensities = N_t[mutant_parent_indices] * mutant_rates * self.mutant_fitnesses * self.mutant_selcoeffs # TODO: Should the final term corresponding to prob of establishment be (mutant fitness - mean fitness of pop) or (mutant_fitness - fitness of parent?)
+            self.mutation_propensities = N_t[mutation_parent_indices] * mutant_rates * self.mutant_fitnesses * self.mutant_selcoeffs # TODO: Should the final term corresponding to prob of establishment be (mutant fitness - mean fitness of pop) or (mutant_fitness - fitness of parent?)
             self.mutation_propensities[self.mutation_propensities < 0] = 0  # negative propensities due to negative growthrate or selcoeff are zeroed out
             # - - - -
             dTotalPropensity += np.sum(self.mutation_propensities)
@@ -381,7 +383,7 @@ class ConsumerResourceSystem():
             self.segregant_selcoeffs = self.segregant_fitnesses - mean_fitness
             self.segregant_selcoeffs[self.segregant_selcoeffs < 0] = 0
             # - - - -
-            self.segregation_propensities = N_t[segregant_parent_indices] * segregant_rates * self.segregant_fitnesses * self.segregant_selcoeffs
+            self.segregation_propensities = N_t[segregation_parent_indices] * segregant_rates * self.segregant_fitnesses * self.segregant_selcoeffs
             self.segregation_propensities[self.segregation_propensities < 0] = 0  # negative propensities due to negative growthrate or selcoeff are zeroed out
             # - - - -
             dTotalPropensity += np.sum(self.segregation_propensities)
@@ -391,7 +393,7 @@ class ConsumerResourceSystem():
             self.transconjugant_selcoeffs = self.transconjugant_fitnesses - mean_fitness
             self.transconjugant_selcoeffs[self.transconjugant_selcoeffs < 0] = 0
             # - - - -
-            self.transfer_propensities = N_t[transconjugant_donor_indices] * N_t[transconjugant_recip_indices] * transconjugant_rates * self.transconjugant_fitnesses * self.transconjugant_selcoeffs
+            self.transfer_propensities = N_t[transfer_donor_indices] * N_t[transfer_recip_indices] * transconjugant_rates * self.transconjugant_fitnesses * self.transconjugant_selcoeffs
             self.transfer_propensities[self.transfer_propensities < 0] = 0  # negative propensities due to negative growthrate or selcoeff are zeroed out
             # - - - -
             dTotalPropensity += np.sum(self.transfer_propensities)
@@ -409,9 +411,9 @@ class ConsumerResourceSystem():
                     influx_rate, decay_rate, energy_content, resource_dynamics_mode, resource_influx_mode,
                     uptake_coeffs=None, consumption_coeffs=None):
         #------------------------------
-        energy_uptake = ConsumerResourceSystem.energy_uptake(N, R, t, traits, consumption_rate, carrying_capacity, energy_passthru,
-                                                             influx_rate, decay_rate, energy_content, resource_dynamics_mode, resource_influx_mode,
-                                                             uptake_coeffs, consumption_coeffs)
+        energy_uptake = Community.energy_uptake(N, R, t, traits, consumption_rate, carrying_capacity, energy_passthru,
+                                                influx_rate, decay_rate, energy_content, resource_dynamics_mode, resource_influx_mode,
+                                                uptake_coeffs, consumption_coeffs)
         energy_surplus = energy_uptake - energy_costs
         growth_rate    = growth_factor * energy_surplus
         #------------------------------
@@ -428,21 +430,21 @@ class ConsumerResourceSystem():
         if(uptake_coeffs is None):
             consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
             uptake_coeffs = consumption_rates_bytrait
-            if(resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+            if(resource_dynamics_mode != Community.RESOURCE_DYNAMICS_FASTEQ):
                 if(np.any(energy_passthru != 0)):
                     uptake_coeffs = uptake_coeffs * (1 - energy_passthru)
                 if(np.any(energy_content != 1)):
                     uptake_coeffs = uptake_coeffs * energy_content
         #------------------------------
         energy_uptake = None
-        if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+        if(resource_dynamics_mode == Community.RESOURCE_DYNAMICS_FASTEQ):
             if(consumption_rates_bytrait is None):
                 consumption_rates_bytrait = np.einsum('ij,ij->ij', traits, consumption_rate) if consumption_rate.ndim == 2 else np.einsum('ij,j->ij', traits, consumption_rate)
             consumption_coeffs = consumption_rates_bytrait / carrying_capacity if consumption_coeffs is None else consumption_coeffs
             _influx_rate    = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
             resource_uptake = _influx_rate / (decay_rate + np.einsum('ij,i->j', consumption_coeffs, N))
             energy_uptake = np.einsum('ij,j->i', uptake_coeffs, resource_uptake)
-        elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
+        elif(resource_dynamics_mode == Community.RESOURCE_DYNAMICS_EXPLICIT):
             energy_uptake = np.einsum('ij,j->i', uptake_coeffs, R)
         #------------------------------
         return energy_uptake
@@ -459,18 +461,18 @@ class ConsumerResourceSystem():
         _influx_rate = influx_rate(t).ravel() if resource_influx_mode == ResourceSet.RESOURCE_INFLUX_TEMPORAL else influx_rate
         #------------------------------
         dRdt = None
-        if(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+        if(resource_dynamics_mode == Community.RESOURCE_DYNAMICS_FASTEQ):
             dRdt = np.zeros(len(R))
-        elif(resource_dynamics_mode == ConsumerResourceSystem.RESOURCE_DYNAMICS_EXPLICIT):
-            if(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_NONE):
+        elif(resource_dynamics_mode == Community.RESOURCE_DYNAMICS_EXPLICIT):
+            if(resource_crossfeeding_mode == Community.RESOURCE_CROSSFEEDING_NONE):
                 resource_consumption_rate = np.einsum('ij,j->j', np.einsum('ij,i->ij', consumption_coeffs, N), R)
                 dRdt = _influx_rate - decay_rate * R - resource_consumption_rate
-            elif(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HOMOTYPES):
+            elif(resource_crossfeeding_mode == Community.RESOURCE_CROSSFEEDING_HOMOTYPES):
                 resource_consumption_rate = np.einsum('ij,j->j', np.einsum('ij,i->ij', consumption_coeffs, N), R)  # shape = (num_resources,)
                 resource_leak_rate = energy_passthru * resource_consumption_rate
                 resource_conversion_rate = np.einsum('ij,j->i', cross_production_energy, resource_leak_rate)
                 dRdt = _influx_rate - decay_rate * R - resource_consumption_rate + resource_conversion_rate
-            elif(resource_crossfeeding_mode == ConsumerResourceSystem.RESOURCE_CROSSFEEDING_HETEROTYPES):
+            elif(resource_crossfeeding_mode == Community.RESOURCE_CROSSFEEDING_HETEROTYPES):
                 resource_consumption_terms = np.einsum('ij,j->ij', np.einsum('ij,i->ij', consumption_coeffs, N), R)  # gives shape = (num_types, num_resources)
                 resource_consumption_rate = np.sum(resource_consumption_terms, axis=0)  # gives shape = (num_resources,)
                 resource_leak_rate = np.einsum('ij,ij->j', energy_passthru, resource_consumption_terms)  # gives shape = (num_resources,)
@@ -486,59 +488,60 @@ class ConsumerResourceSystem():
         #----------------------------------
         type_params = self.type_set.get_dynamics_params(type_idx)
         del type_params['creation_rate']
-        del type_params['parent_indices']
-        del type_params['donor_indices']
-        del type_params['recip_indices']
+        del type_params['mutation_parent_indices']
+        del type_params['segregation_parent_indices']
+        del type_params['transfer_donor_indices']
+        del type_params['transfer_recip_indices']
         #----------------------------------
         if(self.mutant_set.num_types > 0):
             mutant_params = self.mutant_set.get_dynamics_params(self.type_set.get_mutant_indices(type_idx))
-            type_params['traits']                = np.concatenate([type_params['traits'], mutant_params['traits']])
-            type_params['consumption_rate']      = utils.SystemParameter.combine(type_params['consumption_rate'], mutant_params['consumption_rate'])
-            type_params['carrying_capacity']     = utils.SystemParameter.combine(type_params['carrying_capacity'], mutant_params['carrying_capacity'])
-            type_params['energy_passthru']       = utils.SystemParameter.combine(type_params['energy_passthru'], mutant_params['energy_passthru'])
-            type_params['growth_factor']         = utils.SystemParameter.combine(type_params['growth_factor'], mutant_params['growth_factor'])
-            type_params['energy_costs']          = np.concatenate([type_params['energy_costs'], mutant_params['energy_costs']])
-            type_params['num_mutants']           = mutant_params['num_types']
-            type_params['mutant_rates']          = mutant_params['creation_rate']
-            type_params['mutant_parent_indices'] = [utils.find_first(pidx, type_idx) for pidx in mutant_params['parent_indices']]
+            type_params['traits']                  = np.concatenate([type_params['traits'], mutant_params['traits']])
+            type_params['consumption_rate']        = utils.SystemParameter.combine(type_params['consumption_rate'], mutant_params['consumption_rate'])
+            type_params['carrying_capacity']       = utils.SystemParameter.combine(type_params['carrying_capacity'], mutant_params['carrying_capacity'])
+            type_params['energy_passthru']         = utils.SystemParameter.combine(type_params['energy_passthru'], mutant_params['energy_passthru'])
+            type_params['growth_factor']           = utils.SystemParameter.combine(type_params['growth_factor'], mutant_params['growth_factor'])
+            type_params['energy_costs']            = np.concatenate([type_params['energy_costs'], mutant_params['energy_costs']])
+            type_params['num_mutants']             = mutant_params['num_types']
+            type_params['mutant_rates']            = mutant_params['creation_rate']
+            type_params['mutation_parent_indices'] = [utils.find_first(pidx, type_idx) for pidx in mutant_params['mutation_parent_indices']]
         else:
-            type_params['num_mutants']           = 0
-            type_params['mutant_rates']          = 0
-            type_params['mutant_parent_indices'] = 0
+            type_params['num_mutants']             = 0
+            type_params['mutant_rates']            = 0
+            type_params['mutation_parent_indices'] = 0
         #----------------------------------
         if(self.segregant_set.num_types > 0):
             segregant_params = self.segregant_set.get_dynamics_params(self.type_set.get_segregant_indices(type_idx))
-            type_params['traits']                   = np.concatenate([type_params['traits'], segregant_params['traits']])
-            type_params['consumption_rate']         = utils.SystemParameter.combine(type_params['consumption_rate'], segregant_params['consumption_rate'])
-            type_params['carrying_capacity']        = utils.SystemParameter.combine(type_params['carrying_capacity'], segregant_params['carrying_capacity'])
-            type_params['energy_passthru']          = utils.SystemParameter.combine(type_params['energy_passthru'], segregant_params['energy_passthru'])
-            type_params['growth_factor']            = utils.SystemParameter.combine(type_params['growth_factor'], segregant_params['growth_factor'])
-            type_params['energy_costs']             = np.concatenate([type_params['energy_costs'], segregant_params['energy_costs']])
-            type_params['num_segregants']           = segregant_params['num_types']
-            type_params['segregant_rates']          = segregant_params['creation_rate']
-            type_params['segregant_parent_indices'] = [utils.find_first(pidx, type_idx) for pidx in segregant_params['parent_indices']]
+            type_params['traits']                     = np.concatenate([type_params['traits'], segregant_params['traits']])
+            type_params['consumption_rate']           = utils.SystemParameter.combine(type_params['consumption_rate'], segregant_params['consumption_rate'])
+            type_params['carrying_capacity']          = utils.SystemParameter.combine(type_params['carrying_capacity'], segregant_params['carrying_capacity'])
+            type_params['energy_passthru']            = utils.SystemParameter.combine(type_params['energy_passthru'], segregant_params['energy_passthru'])
+            type_params['growth_factor']              = utils.SystemParameter.combine(type_params['growth_factor'], segregant_params['growth_factor'])
+            type_params['energy_costs']               = np.concatenate([type_params['energy_costs'], segregant_params['energy_costs']])
+            type_params['num_segregants']             = segregant_params['num_types']
+            type_params['segregant_rates']            = segregant_params['creation_rate']
+            type_params['segregation_parent_indices'] = [utils.find_first(pidx, type_idx) for pidx in segregant_params['segregation_parent_indices']]
         else:
-            type_params['num_segregants']           = 0
-            type_params['segregant_rates']          = 0
-            type_params['segregant_parent_indices'] = 0
+            type_params['num_segregants']             = 0
+            type_params['segregant_rates']            = 0
+            type_params['segregation_parent_indices'] = 0
         #----------------------------------
         if(self.transconjugant_set.num_types > 0):
             transconjugant_params = self.transconjugant_set.get_dynamics_params(self.type_set.get_transconjugant_indices(type_idx))
-            type_params['traits']                       = np.concatenate([type_params['traits'], transconjugant_params['traits']])
-            type_params['consumption_rate']             = utils.SystemParameter.combine(type_params['consumption_rate'], transconjugant_params['consumption_rate'])
-            type_params['carrying_capacity']            = utils.SystemParameter.combine(type_params['carrying_capacity'], transconjugant_params['carrying_capacity'])
-            type_params['energy_passthru']              = utils.SystemParameter.combine(type_params['energy_passthru'], transconjugant_params['energy_passthru'])
-            type_params['growth_factor']                = utils.SystemParameter.combine(type_params['growth_factor'], transconjugant_params['growth_factor'])
-            type_params['energy_costs']                 = np.concatenate([type_params['energy_costs'], transconjugant_params['energy_costs']])
-            type_params['num_transconjugants']          = transconjugant_params['num_types']
-            type_params['transconjugant_rates']         = transconjugant_params['creation_rate']
-            type_params['transconjugant_donor_indices'] = [utils.find_first(didx, type_idx) for didx in transconjugant_params['donor_indices']]
-            type_params['transconjugant_recip_indices'] = [utils.find_first(ridx, type_idx) for ridx in transconjugant_params['recip_indices']]
+            type_params['traits']                 = np.concatenate([type_params['traits'], transconjugant_params['traits']])
+            type_params['consumption_rate']       = utils.SystemParameter.combine(type_params['consumption_rate'], transconjugant_params['consumption_rate'])
+            type_params['carrying_capacity']      = utils.SystemParameter.combine(type_params['carrying_capacity'], transconjugant_params['carrying_capacity'])
+            type_params['energy_passthru']        = utils.SystemParameter.combine(type_params['energy_passthru'], transconjugant_params['energy_passthru'])
+            type_params['growth_factor']          = utils.SystemParameter.combine(type_params['growth_factor'], transconjugant_params['growth_factor'])
+            type_params['energy_costs']           = np.concatenate([type_params['energy_costs'], transconjugant_params['energy_costs']])
+            type_params['num_transconjugants']    = transconjugant_params['num_types']
+            type_params['transconjugant_rates']   = transconjugant_params['creation_rate']
+            type_params['transfer_donor_indices'] = [utils.find_first(didx, type_idx) for didx in transconjugant_params['transfer_donor_indices']]
+            type_params['transfer_recip_indices'] = [utils.find_first(ridx, type_idx) for ridx in transconjugant_params['transfer_recip_indices']]
         else:
-            type_params['num_transconjugants']          = 0
-            type_params['transconjugant_rates']         = 0
-            type_params['transconjugant_donor_indices'] = 0
-            type_params['transconjugant_recip_indices'] = 0
+            type_params['num_transconjugants']    = 0
+            type_params['transconjugant_rates']   = 0
+            type_params['transfer_donor_indices'] = 0
+            type_params['transfer_recip_indices'] = 0
         #----------------------------------
         type_params['consumption_rate']  = type_params['consumption_rate'].values()
         type_params['carrying_capacity'] = type_params['carrying_capacity'].values()
@@ -550,7 +553,7 @@ class ConsumerResourceSystem():
         consumption_rates_bytrait = np.einsum('ij,ij->ij', type_params['traits'], type_params['consumption_rate']) if type_params['consumption_rate'].ndim == 2 else np.einsum('ij,j->ij', type_params['traits'], type_params['consumption_rate'])
         # ------------------
         uptake_coeffs = consumption_rates_bytrait
-        if(self.resource_dynamics_mode != ConsumerResourceSystem.RESOURCE_DYNAMICS_FASTEQ):
+        if(self.resource_dynamics_mode != Community.RESOURCE_DYNAMICS_FASTEQ):
             if(np.any(type_params['energy_passthru'] != 0)):
                 uptake_coeffs = uptake_coeffs * (1 - type_params['energy_passthru'])
             if(np.any(resource_params['energy_content'] != 1)):
@@ -602,7 +605,7 @@ class ConsumerResourceSystem():
         mutant_abundance = np.maximum(1 / mutant_fitness, 1)
         #----------------------------------
         # Get the index of the parent of the selected mutant:
-        parent_idx = mutant.parent_indices[0]
+        parent_idx = mutant.mutation_parent_indices[0]
         #----------------------------------
         if(self.convergent_lineages and mutant_type_id in self.type_set.typeIDs):
             # This "mutant" is a pre-existing type in the population; get its index:
@@ -634,7 +637,7 @@ class ConsumerResourceSystem():
         segregant_abundance = np.maximum(1 / segregant_fitness, 1)
         #----------------------------------
         # Get the index of the parent of the selected segregant:
-        parent_idx = segregant.parent_indices[0]
+        parent_idx = segregant.segregation_parent_indices[0]
         #----------------------------------
         if(self.convergent_lineages and segregant_type_id in self.type_set.typeIDs):
             # This "segregant" is a pre-existing type in the population; get its index:
@@ -666,8 +669,8 @@ class ConsumerResourceSystem():
         transconjugant_abundance = np.maximum(1 / transconjugant_fitness, 1)
         #----------------------------------
         # Get the index of the donor and recipient types associated with the selected transconjugant:
-        donor_idx = transconjugant.donor_indices[0]
-        recip_idx = transconjugant.recip_indices[0]
+        donor_idx = transconjugant.transfer_donor_indices[0]
+        recip_idx = transconjugant.transfer_recip_indices[0]
         #----------------------------------
         if(self.convergent_lineages and transconjugant_type_id in self.type_set.typeIDs):
             # This "transconjugant" is a pre-existing type in the population; get its index:

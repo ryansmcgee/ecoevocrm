@@ -92,7 +92,7 @@ def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', high
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None, t_downsample='default', log_x_axis=False,
+def abundance_plot(system, ax=None, relative_abundance=False, t_max=None, t_downsample='default', log_x_axis=False, stacked=True, baseline='sym',
                             type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
                             color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01,
                             linewidth=None, edgecolor=None, color_seed=None):
@@ -112,10 +112,14 @@ def stacked_abundance_plot(system, ax=None, relative_abundance=False, t_max=None
     
     ax = plt.axes() if ax is None else ax
 
-    if(relative_abundance):
-        ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip((system.N_series/np.sum(system.N_series, axis=0))[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+    if(stacked):
+        if(relative_abundance):
+            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip((system.N_series/np.sum(system.N_series, axis=0))[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+        else:
+            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip(system.N_series[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline=baseline, colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
     else:
-        ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip(system.N_series[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='sym', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+        for u in range(system.num_types):
+            ax.plot(system.t_series[system.t_series < t_max][::t_downsample], system.N_series[:, system.t_series < t_max][u, ::t_downsample], color=type_colors[::-1][u])
 
     if(log_x_axis):
         ax.set_xscale('log')

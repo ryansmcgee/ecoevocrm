@@ -106,11 +106,11 @@ resource_dynamics_mode='fasteq'
 
 # ## Simulate model
 
-system = ConsumerResourceSystem(type_set=TypeSet(sigma=sigma, xi=xi, chi=chi, J=J, binarize_traits_J_cost_terms=True, mu=1e-10),
-                                rho=rho, tau=tau,
-                                N_init=N_init, R_init=R_init, 
-                                resource_dynamics_mode='explicit', 
-                                max_time_step=1e3)
+system = Community(type_set=TypeSet(sigma=sigma, xi=xi, chi=chi, J=J, binarize_traits_J_cost_terms=True, mu=1e-10),
+                   rho=rho, tau=tau,
+                   N_init=N_init, R_init=R_init,
+                   resource_dynamics_mode='explicit',
+                   max_time_step=1e3)
 
 
 T_total = 1e6
