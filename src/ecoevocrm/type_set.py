@@ -638,6 +638,22 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+    def get_progenitor_indices(self, type_index=None):
+        type_idx = utils.treat_as_list(type_index)
+        progenitor_indices = [None for u in type_idx]
+        for u, idx in enumerate(type_idx):
+            if(self.mutation_parent_indices[idx] is not None):
+                progenitor_indices[u] = self.mutation_parent_indices[idx]
+            elif(self.segregation_parent_indices[idx] is not None):
+                progenitor_indices[u] = self.segregation_parent_indices[idx]
+            elif(self.transfer_recip_indices[idx] is not None):
+                progenitor_indices[u] = self.transfer_recip_indices[idx]
+            else:
+                pass  # leave progenitor_indices[u] as None
+        return progenitor_indices
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
     def get_dynamics_params(self, type_index=None, values_only=False):
         type_idx = utils.treat_as_list(type_index) if type_index is not None else range(self.num_types)
         #----------------------------------

@@ -620,7 +620,7 @@ class Community():
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
         #----------------------------------
-        print(f"[ Mutation event occurred at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {mutant.trait_keys[0]}\n", end="")
+        print(f"[ Mutant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {mutant.trait_keys[0]}\n", end="")
         return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -652,7 +652,7 @@ class Community():
             # Remove corresonding abundance from the parent type (abundance is moved from parent to segregant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - segregant_abundance, 1))
         #----------------------------------
-        print(f"[ Segregation event occurred at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {segregant.trait_keys[0]}\n", end="")
+        print(f"[ Segregant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {segregant.trait_keys[0]}\n", end="")
         return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -685,7 +685,7 @@ class Community():
             # Remove corresonding abundance from the recipient type (abundance is moved from recipient to transconjugant):
             self.set_type_abundance(type_index=recip_idx, abundance=max(self.get_type_abundance(recip_idx) - transconjugant_abundance, 1))
         #----------------------------------
-        print(f"[ Transfer event occurred at t={self.t:.2f} ]\t{self.type_set.trait_keys[donor_idx]}+{self.type_set.trait_keys[recip_idx]} --> {transconjugant.trait_keys[0]}\n", end="")
+        print(f"[ Transconjugant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[donor_idx]}+{self.type_set.trait_keys[recip_idx]} --> {transconjugant.trait_keys[0]}\n", end="")
         return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

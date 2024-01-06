@@ -36,93 +36,298 @@ def matrix_plot(mat, ax=None, cmap=None, vmin=None, vmax=None, center=None, cbar
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
-                             color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01, color_seed=None):
+def truncate_colormap(cmap, minval=0.0, maxval=1.0, steps=256):
+    new_cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+        'trunc({n},{a:.2f},{b:.2f})'.format(n=cmap.name, a=minval, b=maxval),
+        cmap(np.linspace(minval, maxval, steps)))
+    return new_cmap
 
-    color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
-    np.random.seed(color_seed)
+def concatenate_colormaps(cmap1, cmap2, steps=256):
+    # sample colors from the light and dark colormaps
+    colors1 = cmap1(np.linspace(0.0, 1.0, int(steps/2)))
+    colors2 = cmap2(np.linspace(0.0, 1.0, int(steps/2)))
+    # combine them and build a new colormap
+    colors = np.vstack((colors1, colors2))
+    cmap   = matplotlib.colors.LinearSegmentedColormap.from_list(f"{cmap1.name}-{cmap2.name}", colors)
+    return cmap
 
-    # TODO: Make the range of random updates to child color based on phenotype or fitness difference between parent and child
+def lightdark_cmap(color, cmin=0, cmax=1, steps=256, reverse=False):
+    cmap_light = sns.light_palette(color, as_cmap=True)
+    cmap_dark  = sns.dark_palette(color, as_cmap=True, reverse=True)
+    cmap = concatenate_colormaps(cmap_light, cmap_dark, steps=steps)
+    cmap = truncate_colormap(cmap, cmin, cmax, steps=steps)
+    return cmap if not reverse else cmap.reversed()
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1,
+                              palette='hls', palette_depth=0, shuffle_palette=True, seed=None,
+                              color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark'):
+
+    _rng = np.random.default_rng(seed)
 
     num_palette_types = 0
     lineageIDs = np.asarray(type_set.lineageIDs)
     for lineage_id in lineageIDs:
-        if(lineage_id.count('.') == apply_palette_depth):
+        if(lineage_id.count('.') == palette_depth):
             num_palette_types += 1
 
     palette = sns.color_palette(palette, num_palette_types)
     if(shuffle_palette):
-        np.random.shuffle(palette)
-    
-    type_colors = [root_color for i in range(type_set.num_types)]
+        _rng.shuffle(palette)
 
-    if(isinstance(highlight_clades, str) and highlight_clades == 'all'):
-        highlight_clades = list(type_set.phylogeny.keys())
-    
-    def color_subtree(d, parent_color, depth, next_palette_color_idx):
+    type_colors = [base_color for i in range(type_set.num_types)]
+
+    #------------------------
+
+    if(clade_colors is None):
+        clade_colors = {}
+        if(color_tags is not None):
+            for lineage_id in type_set.lineageIDs:
+                lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0]
+                for tag in color_tags.keys():
+                    if(tag in lineage_id_lastpart):
+                        if(isinstance(color_tags[tag], dict)):
+                            tag_count = lineage_id.count(tag)
+                            clade_colors[lineage_id] = color_tags[tag][tag_count]
+                        else:
+                            clade_colors[lineage_id] = color_tags[tag]
+                        break
+
+    #------------------------
+
+    def color_clade(d, parent_color, depth, next_palette_color_idx):
         if(not isinstance(d, dict) or not d):
             return
-        parent_color_rgb   = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4)) if ('#' in parent_color and len(parent_color)==7) else parent_color
+
+        if(isinstance(parent_color, str)):
+            parent_color = matplotlib.colors.to_rgb(parent_color)
+
         for lineage_id, descendants in d.items():
-            type_idx       = np.argmax(lineageIDs == lineage_id)
-            if(depth == apply_palette_depth):
+            type_idx   = np.argmax(lineageIDs == lineage_id)
+            parent_idx = type_set.get_progenitor_indices(type_idx)[0]
+
+            type_cost   = type_set.energy_costs[type_idx]
+            parent_cost = type_set.energy_costs[parent_idx] if parent_idx is not None else None
+            cost_diff   = np.abs(parent_cost - type_cost) if parent_idx is not None else None
+
+            type_cmap  = None
+            type_color = None
+            if(depth==0):
+                type_color = parent_color
+            if(depth == palette_depth):
                 type_color = palette[next_palette_color_idx]
                 next_palette_color_idx += 1
-            elif(depth==0):
-                type_color = parent_color_rgb
-            elif(depth < apply_palette_depth):
-                color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
-                type_color = tuple([np.clip((parent_color_rgb[0] + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1)]*3)
-            else:
-                color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
-                type_color = tuple([np.clip((v + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1) for v in parent_color_rgb])
+            if(lineage_id in clade_colors):
+                clade_color = clade_colors[lineage_id]
+                if(isinstance(clade_color, matplotlib.colors.LinearSegmentedColormap)):
+                    type_cmap  = clade_color
+                    type_color = type_cmap( (type_cost - vmin)/(vmax - vmin) )  # here clade_color is a cmap
+                else:
+                    type_color = clade_color
+            if(type_color is None):  # type_color did not meet any of the criteria above:
+                if(isinstance(parent_color, matplotlib.colors.LinearSegmentedColormap)):
+                    type_cmap  = parent_color
+                    type_color = type_cmap( (type_cost - vmin)/(vmax - vmin) )  # here parent_color is a cmap
+                else:
+                    color_step = min(max(cost_diff, color_step_min), color_step_max)
+                    color_step_coeff = -color_step_scale if color_step_dir == 'dark' else color_step_scale if color_step_dir == 'light' else _rng.choice([-color_step_scale, color_step_scale])
+                    if(depth < palette_depth):
+                        type_color = tuple([np.clip((parent_color[0] + color_step_coeff*color_step), 0, 1)]*3)
+                    else:
+                        type_color = tuple([np.clip((v + color_step_coeff*color_step), 0, 1) for v in parent_color])
+
+            #--------------------
             type_colors[type_idx] = type_color
-            color_subtree(descendants, type_color, depth+1, next_palette_color_idx)
-        
-    color_subtree(type_set.phylogeny, parent_color=root_color, depth=0, next_palette_color_idx=0)
+            pass_color = type_color if type_cmap is None else type_cmap
+            color_clade(descendants, pass_color, depth+1, next_palette_color_idx)
 
-    if(not (isinstance(highlight_clades, str) and highlight_clades == 'all')):
-        lineageIDs = np.asarray([lid+'.' for lid in lineageIDs])
-        for i, color in enumerate(type_colors):
-            if(not any(lineageIDs[i].startswith(str(highlight_id).strip('.')+'.') for highlight_id in highlight_clades)):
-                type_colors[i] = [type_colors[i][0]]*3
+    color_clade(type_set.phylogeny, parent_color=base_color, depth=0, next_palette_color_idx=0)
 
-    return type_colors
+    #------------------------
+
+    type_hatches = ['' for u in range(type_set.num_types)]
+    if(hatch_tags is not None):
+        for u, lineage_id in enumerate(type_set.lineageIDs):
+            lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0]
+            for tag in hatch_tags.keys():
+                if(tag in lineage_id_lastpart):
+                    if(isinstance(hatch_tags[tag], dict)):
+                        tag_count = lineage_id.count(tag)
+                        type_hatches[u] = hatch_tags[tag][tag_count]
+                    else:
+                        type_hatches[u] = hatch_tags[tag]
+                    break
+
+    #------------------------
+    return type_colors, type_hatches
+
+#OLD:
+# def assign_type_colors(type_set, base_color='#AAAAAA', clade_colors={}, palette='hls', palette_depth=0, shuffle_palette=True, seed=None,
+#                        color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark'):
+#
+#     _rng = np.random.default_rng(seed)
+#
+#     num_palette_types = 0
+#     lineageIDs = np.asarray(type_set.lineageIDs)
+#     for lineage_id in lineageIDs:
+#         if(lineage_id.count('.') == palette_depth):
+#             num_palette_types += 1
+#
+#     palette = sns.color_palette(palette, num_palette_types)
+#     if(shuffle_palette):
+#         _rng.shuffle(palette)
+#
+#     type_colors = [base_color for i in range(type_set.num_types)]
+#
+#     def color_clade(d, parent_color, depth, next_palette_color_idx):
+#         if(not isinstance(d, dict) or not d):
+#             return
+#
+#         # if('#' in parent_color and len(parent_color)==7):
+#         #     parent_color = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4))
+#         if(isinstance(parent_color, str)):
+#             parent_color = matplotlib.colors.to_rgb(parent_color)
+#
+#         for lineage_id, descendants in d.items():
+#             type_idx   = np.argmax(lineageIDs == lineage_id)
+#             parent_idx = type_set.get_progenitor_indices(type_idx)[0]
+#
+#             type_cost   = type_set.energy_costs[type_idx]
+#             parent_cost = type_set.energy_costs[parent_idx] if parent_idx is not None else None
+#             cost_diff   = np.abs(parent_cost - type_cost) if parent_idx is not None else None
+#
+#             type_cmap  = None
+#             type_color = None
+#             if(depth==0):
+#                 type_color = parent_color
+#             if(depth == palette_depth):
+#                 type_color = palette[next_palette_color_idx]
+#                 next_palette_color_idx += 1
+#             if(lineage_id in clade_colors):
+#                 clade_color = clade_colors[lineage_id]
+#                 if(isinstance(clade_color, matplotlib.colors.LinearSegmentedColormap)):
+#                     type_cmap  = clade_color
+#                     type_color = type_cmap(type_cost)  # here clade_color is a cmap
+#                 else:
+#                     type_color = clade_color
+#             if(type_color is None):  # type_color did not meet any of the criteria above:
+#                 if(isinstance(parent_color, matplotlib.colors.LinearSegmentedColormap)):
+#                     type_cmap  = parent_color
+#                     type_color = type_cmap(type_cost)  # here parent_color is a cmap
+#                 else:
+#                     color_step = min(max(cost_diff, color_step_min), color_step_max)
+#                     color_step_coeff = -color_step_scale if color_step_dir == 'dark' else color_step_scale if color_step_dir == 'light' else _rng.choice([-color_step_scale, color_step_scale])
+#                     if(depth < palette_depth):
+#                         type_color = tuple([np.clip((parent_color[0] + color_step_coeff*color_step), 0, 1)]*3)
+#                     else:
+#                         type_color = tuple([np.clip((v + color_step_coeff*color_step), 0, 1) for v in parent_color])
+#
+#
+#             #--------------------
+#             type_colors[type_idx] = type_color
+#             pass_color = type_color if type_cmap is None else type_cmap
+#             color_clade(descendants, pass_color, depth+1, next_palette_color_idx)
+#
+#     color_clade(type_set.phylogeny, parent_color=base_color, depth=0, next_palette_color_idx=0)
+#
+#     return type_colors
+#
+#
+# # EVEN OLDER VERSION BELOW:
+# def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True,
+#                              color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01, color_seed=None):
+#
+#     color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
+#     np.random.seed(color_seed)
+#
+#     num_palette_types = 0
+#     lineageIDs = np.asarray(type_set.lineageIDs)
+#     for lineage_id in lineageIDs:
+#         if(lineage_id.count('.') == apply_palette_depth):
+#             num_palette_types += 1
+#
+#     palette = sns.color_palette(palette, num_palette_types)
+#     if(shuffle_palette):
+#         np.random.shuffle(palette)
+#
+#     type_colors = [root_color for i in range(type_set.num_types)]
+#
+#     if(isinstance(highlight_clades, str) and highlight_clades == 'all'):
+#         highlight_clades = list(type_set.phylogeny.keys())
+#
+#     def color_subtree(d, parent_color, depth, next_palette_color_idx):
+#         if(not isinstance(d, dict) or not d):
+#             return
+#         parent_color_rgb   = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4)) if ('#' in parent_color and len(parent_color)==7) else parent_color
+#         for lineage_id, descendants in d.items():
+#             type_idx       = np.argmax(lineageIDs == lineage_id)
+#             if(depth == apply_palette_depth):
+#                 type_color = palette[next_palette_color_idx]
+#                 next_palette_color_idx += 1
+#             elif(depth==0):
+#                 type_color = parent_color_rgb
+#             elif(depth < apply_palette_depth):
+#                 color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
+#                 type_color = tuple([np.clip((parent_color_rgb[0] + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1)]*3)
+#             else:
+#                 color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
+#                 type_color = tuple([np.clip((v + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1) for v in parent_color_rgb])
+#             type_colors[type_idx] = type_color
+#             color_subtree(descendants, type_color, depth+1, next_palette_color_idx)
+#
+#     color_subtree(type_set.phylogeny, parent_color=root_color, depth=0, next_palette_color_idx=0)
+#
+#     if(not (isinstance(highlight_clades, str) and highlight_clades == 'all')):
+#         lineageIDs = np.asarray([lid+'.' for lid in lineageIDs])
+#         for i, color in enumerate(type_colors):
+#             if(not any(lineageIDs[i].startswith(str(highlight_id).strip('.')+'.') for highlight_id in highlight_clades)):
+#                 type_colors[i] = [type_colors[i][0]]*3
+#
+#     return type_colors
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def abundance_plot(system, ax=None, relative_abundance=False, t_max=None, t_downsample='default', log_x_axis=False, stacked=True, baseline='sym',
-                            type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
-                            color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01,
-                            linewidth=None, edgecolor=None, color_seed=None):
+def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, relative_abundance=False, stacked=True, baseline='sym', t_max=None, t_downsample='default', log_x_axis=False,
+                   base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1, palette='hls', palette_depth=0, shuffle_palette=True, color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark', seed=None,
+                   linewidth=None, edgecolor=None):
 
-    if(type_colors is None):
-        color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
-        np.random.seed(color_seed)
-        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min, color_seed=color_seed)
+    if(type_colors is None or type_hatches is None):
+        _type_colors, _type_hatches = type_styles_by_phylogeny(community.type_set, base_color=base_color, clade_colors=clade_colors, color_tags=color_tags, hatch_tags=hatch_tags, vmin=vmin, vmax=vmax,
+                                               palette=palette, palette_depth=palette_depth, shuffle_palette=shuffle_palette, seed=seed,
+                                               color_step_min=color_step_min, color_step_max=color_step_max, color_step_scale=color_step_scale, color_step_dir=color_step_dir)
+        type_colors  = _type_colors if type_colors is None else type_colors
+        type_hatches = _type_hatches if type_hatches is None else type_hatches
 
     if(t_max is None):
-        t_max = np.max(system.t_series)
+        t_max = np.max(community.t_series)
 
     if(t_downsample == 'default'):
-        t_downsample = max(int((len(system.t_series)//10000)+1), 1)
+        t_downsample = max(int((len(community.t_series)//10000)+1), 1)
     elif(t_downsample is None):
         t_downsample = 1
-    
+
     ax = plt.axes() if ax is None else ax
 
     if(stacked):
         if(relative_abundance):
-            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip((system.N_series/np.sum(system.N_series, axis=0))[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+            stacks = ax.stackplot(community.t_series[community.t_series < t_max][::t_downsample], np.flip((community.N_series/np.sum(community.N_series, axis=0))[:, community.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
         else:
-            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip(system.N_series[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline=baseline, colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+            stacks = ax.stackplot(community.t_series[community.t_series < t_max][::t_downsample], np.flip(community.N_series[:, community.t_series < t_max][:, ::t_downsample], axis=0), baseline=baseline, colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+
+        if(type_hatches is not None):
+            for stack, hatch in zip(stacks, type_hatches[::-1]):
+                stack.set_hatch(hatch)
+
     else:
-        for u in range(system.num_types):
-            ax.plot(system.t_series[system.t_series < t_max][::t_downsample], system.N_series[:, system.t_series < t_max][u, ::t_downsample], color=type_colors[::-1][u])
+        for u in range(community.num_types):
+            ax.plot(community.t_series[community.t_series < t_max][::t_downsample], community.N_series[:, community.t_series < t_max][u, ::t_downsample], color=type_colors[u])
 
     if(log_x_axis):
         ax.set_xscale('log')
+
+    ax.grid(False)
 
     return ax
 
@@ -195,7 +400,7 @@ def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineag
                    color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
     
     if(type_colors is None):
-        type_colors = viz.color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min)
+        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min)
     
     ax = plt.axes() if ax is None else ax
     
