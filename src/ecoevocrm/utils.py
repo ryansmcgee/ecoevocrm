@@ -284,7 +284,7 @@ class ExpandableArray():
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangular=False, diagonal=None, ordered=False, order_power=0, scale_range=None, seed=None):
+def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangular=False, diagonal=None, ordered=False, shuffle=False, order_power=0, scale_range=None, seed=None):
     if(seed is not None):
         np.random.seed(seed)
     #--------------------------------
@@ -377,13 +377,13 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
     # Make ordered, if applicable:
     if(ordered):
         vals = np.array(sorted(M[M!=0], key=abs, reverse=True))
-
-        def weighted_shuffle(items, weights):
-            order = sorted(range(len(items)), key=lambda i: np.random.uniform(low=0, high=1) ** (1.0 / weights[i]))
-            return [items[i] for i in order]
-
-        vals = weighted_shuffle(items=vals, weights=((vals**order_power)/np.sum(vals**order_power))[::-1])
-
+        # I don't think this works,
+        # and definitely doesn't seem like it should be under the if(ordered):
+        # def weighted_shuffle(items, weights):
+        #     # From https://softwareengineering.stackexchange.com/questions/233541/how-to-implement-a-weighted-shuffle
+        #     order = sorted(range(len(items)), key=lambda i: np.random.uniform(low=0, high=1) ** (1.0 / weights[i]))
+        #     return [items[i] for i in order]
+        # vals = weighted_shuffle(items=vals, weights=((vals**order_power)/np.sum(vals**order_power))[::-1])
         c = 0
         for j in range(M.shape[1]):
             for i in range(M.shape[0]):
@@ -391,6 +391,20 @@ def random_matrix(shape, mode, args={}, sparsity=0.0, symmetric=False, triangula
                     M[i,j] = vals[c]
                     c += 1
 
+    if(shuffle):
+        vals = M[M!=0].copy()
+        num_vals = len(vals)
+        shuffled_vals = []
+        while len(shuffled_vals) < num_vals:
+            sel_i = np.random.choice(range(len(vals)), p=(np.abs(vals)**order_power)/(np.sum(np.abs(vals)**order_power))) if(len(vals) > 1) else 0
+            shuffled_vals.append(vals[sel_i])
+            vals = np.delete(vals, sel_i)
+        c = 0
+        for j in range(M.shape[1]):
+            for i in range(M.shape[0]):
+                if(M[i,j] != 0):
+                    M[i,j] = shuffled_vals[c]
+                    c += 1
 
     #--------------------------------
     # Scale values to desired range, if applicable:
