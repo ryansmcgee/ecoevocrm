@@ -84,7 +84,7 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
         clade_colors = {}
         if(color_tags is not None):
             for lineage_id in type_set.lineageIDs:
-                lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0]
+                lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0].split('(')[0]
                 for tag in color_tags.keys():
                     if(tag in lineage_id_lastpart):
                         if(isinstance(color_tags[tag], dict)):
@@ -149,7 +149,7 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
     type_hatches = ['' for u in range(type_set.num_types)]
     if(hatch_tags is not None):
         for u, lineage_id in enumerate(type_set.lineageIDs):
-            lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0]
+            lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0].split('(')[0]
             for tag in hatch_tags.keys():
                 if(tag in lineage_id_lastpart):
                     if(isinstance(hatch_tags[tag], dict)):
@@ -161,131 +161,6 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
 
     #------------------------
     return type_colors, type_hatches
-
-#OLD:
-# def assign_type_colors(type_set, base_color='#AAAAAA', clade_colors={}, palette='hls', palette_depth=0, shuffle_palette=True, seed=None,
-#                        color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark'):
-#
-#     _rng = np.random.default_rng(seed)
-#
-#     num_palette_types = 0
-#     lineageIDs = np.asarray(type_set.lineageIDs)
-#     for lineage_id in lineageIDs:
-#         if(lineage_id.count('.') == palette_depth):
-#             num_palette_types += 1
-#
-#     palette = sns.color_palette(palette, num_palette_types)
-#     if(shuffle_palette):
-#         _rng.shuffle(palette)
-#
-#     type_colors = [base_color for i in range(type_set.num_types)]
-#
-#     def color_clade(d, parent_color, depth, next_palette_color_idx):
-#         if(not isinstance(d, dict) or not d):
-#             return
-#
-#         # if('#' in parent_color and len(parent_color)==7):
-#         #     parent_color = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4))
-#         if(isinstance(parent_color, str)):
-#             parent_color = matplotlib.colors.to_rgb(parent_color)
-#
-#         for lineage_id, descendants in d.items():
-#             type_idx   = np.argmax(lineageIDs == lineage_id)
-#             parent_idx = type_set.get_progenitor_indices(type_idx)[0]
-#
-#             type_cost   = type_set.energy_costs[type_idx]
-#             parent_cost = type_set.energy_costs[parent_idx] if parent_idx is not None else None
-#             cost_diff   = np.abs(parent_cost - type_cost) if parent_idx is not None else None
-#
-#             type_cmap  = None
-#             type_color = None
-#             if(depth==0):
-#                 type_color = parent_color
-#             if(depth == palette_depth):
-#                 type_color = palette[next_palette_color_idx]
-#                 next_palette_color_idx += 1
-#             if(lineage_id in clade_colors):
-#                 clade_color = clade_colors[lineage_id]
-#                 if(isinstance(clade_color, matplotlib.colors.LinearSegmentedColormap)):
-#                     type_cmap  = clade_color
-#                     type_color = type_cmap(type_cost)  # here clade_color is a cmap
-#                 else:
-#                     type_color = clade_color
-#             if(type_color is None):  # type_color did not meet any of the criteria above:
-#                 if(isinstance(parent_color, matplotlib.colors.LinearSegmentedColormap)):
-#                     type_cmap  = parent_color
-#                     type_color = type_cmap(type_cost)  # here parent_color is a cmap
-#                 else:
-#                     color_step = min(max(cost_diff, color_step_min), color_step_max)
-#                     color_step_coeff = -color_step_scale if color_step_dir == 'dark' else color_step_scale if color_step_dir == 'light' else _rng.choice([-color_step_scale, color_step_scale])
-#                     if(depth < palette_depth):
-#                         type_color = tuple([np.clip((parent_color[0] + color_step_coeff*color_step), 0, 1)]*3)
-#                     else:
-#                         type_color = tuple([np.clip((v + color_step_coeff*color_step), 0, 1) for v in parent_color])
-#
-#
-#             #--------------------
-#             type_colors[type_idx] = type_color
-#             pass_color = type_color if type_cmap is None else type_cmap
-#             color_clade(descendants, pass_color, depth+1, next_palette_color_idx)
-#
-#     color_clade(type_set.phylogeny, parent_color=base_color, depth=0, next_palette_color_idx=0)
-#
-#     return type_colors
-#
-#
-# # EVEN OLDER VERSION BELOW:
-# def color_types_by_phylogeny(type_set, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True,
-#                              color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01, color_seed=None):
-#
-#     color_seed = np.random.randint(low=0, high=1e9) if color_seed is None else color_seed
-#     np.random.seed(color_seed)
-#
-#     num_palette_types = 0
-#     lineageIDs = np.asarray(type_set.lineageIDs)
-#     for lineage_id in lineageIDs:
-#         if(lineage_id.count('.') == apply_palette_depth):
-#             num_palette_types += 1
-#
-#     palette = sns.color_palette(palette, num_palette_types)
-#     if(shuffle_palette):
-#         np.random.shuffle(palette)
-#
-#     type_colors = [root_color for i in range(type_set.num_types)]
-#
-#     if(isinstance(highlight_clades, str) and highlight_clades == 'all'):
-#         highlight_clades = list(type_set.phylogeny.keys())
-#
-#     def color_subtree(d, parent_color, depth, next_palette_color_idx):
-#         if(not isinstance(d, dict) or not d):
-#             return
-#         parent_color_rgb   = tuple(int(parent_color.strip('#')[i:i+2], 16)/255 for i in (0, 2, 4)) if ('#' in parent_color and len(parent_color)==7) else parent_color
-#         for lineage_id, descendants in d.items():
-#             type_idx       = np.argmax(lineageIDs == lineage_id)
-#             if(depth == apply_palette_depth):
-#                 type_color = palette[next_palette_color_idx]
-#                 next_palette_color_idx += 1
-#             elif(depth==0):
-#                 type_color = parent_color_rgb
-#             elif(depth < apply_palette_depth):
-#                 color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
-#                 type_color = tuple([np.clip((parent_color_rgb[0] + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1)]*3)
-#             else:
-#                 color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
-#                 type_color = tuple([np.clip((v + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1) for v in parent_color_rgb])
-#             type_colors[type_idx] = type_color
-#             color_subtree(descendants, type_color, depth+1, next_palette_color_idx)
-#
-#     color_subtree(type_set.phylogeny, parent_color=root_color, depth=0, next_palette_color_idx=0)
-#
-#     if(not (isinstance(highlight_clades, str) and highlight_clades == 'all')):
-#         lineageIDs = np.asarray([lid+'.' for lid in lineageIDs])
-#         for i, color in enumerate(type_colors):
-#             if(not any(lineageIDs[i].startswith(str(highlight_id).strip('.')+'.') for highlight_id in highlight_clades)):
-#                 type_colors[i] = [type_colors[i][0]]*3
-#
-#     return type_colors
-
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -334,8 +209,9 @@ def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, rela
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def attributes_plot(type_set, ax=None, plot_traits=True, plot_consumption_rate=True, plot_mutation_rate=True, plot_segregation_rate=True, plot_transfer_rate_donor=True, plot_transfer_rate_recip=True,
-                    trait_colors=None):
+def attributes_plot(type_set, ax=None, show_traits=True, type_colors=None, trait_colors=None,
+                    hatch_consumption_rate='...', hatch_mutation_rate='|||', hatch_segregation_rate='---', hatch_transfer_rate_donor='///', hatch_transfer_rate_recip='\\\\\\',
+                    color_consumption_rate='peru', color_mutation_rate='limegreen', color_segregation_rate='gold', color_transfer_rate_donor='mediumpurple', color_transfer_rate_recip='orchid', annot_alpha=1):
 
     ax = plt.axes() if ax is None else ax
 
@@ -344,48 +220,53 @@ def attributes_plot(type_set, ax=None, plot_traits=True, plot_consumption_rate=T
     ax.set_aspect('equal')
     ax.set_ylim(ax.get_ylim()[::-1])
 
-    if(plot_traits):
+    _type_colors  = None
+    _trait_colors = None
+    if(show_traits):
         traits = type_set.traits
-        trait_colors = trait_colors if trait_colors is not None and len(trait_colors) == traits.shape[1] else ['k']*traits.shape[1]
+        if(type_colors is not None and len(type_colors) == traits.shape[0]):
+            _type_colors = type_colors
+        elif(trait_colors is not None and len(trait_colors) == traits.shape[1]):
+            _trait_colors = trait_colors
         for u in range(traits.shape[0]):
             for i in range(traits.shape[1]):
                 if(traits[u, i] != 0):
-                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='w', facecolor=trait_colors[i]))
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='w', facecolor=(_type_colors[u] if _type_colors is not None else _trait_colors[i] if _trait_colors is not None else 'k')))
 
-    if(plot_consumption_rate):
+    if(hatch_consumption_rate):
         consumption_rate = type_set._params['consumption_rate'].values(force_type_dim=True, force_trait_dim=True)
         for u in range(consumption_rate.shape[0]):
             for i in range(consumption_rate.shape[1]):
                 if(consumption_rate[u, i] != 0):
-                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='peru', facecolor='none', hatch='...', alpha=0.5))
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor=color_consumption_rate, facecolor='none', hatch='...', alpha=annot_alpha))
 
-    if(plot_mutation_rate):
+    if(hatch_mutation_rate):
         mutation_rate = type_set._params['mutation_rate'].values(force_type_dim=True, force_trait_dim=True)
         for u in range(mutation_rate.shape[0]):
             for i in range(mutation_rate.shape[1]):
                 if(mutation_rate[u, i] != 0):
-                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='limegreen', facecolor='none', hatch='---', alpha=0.5))
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor=color_mutation_rate, facecolor='none', hatch='|||', alpha=annot_alpha))
 
-    if(plot_segregation_rate):
+    if(hatch_segregation_rate):
         segregation_rate = type_set._params['segregation_rate'].values(force_type_dim=True, force_trait_dim=True)
         for u in range(segregation_rate.shape[0]):
             for i in range(segregation_rate.shape[1]):
                 if(segregation_rate[u, i] != 0):
-                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='gold', facecolor='none', hatch='|||', alpha=0.5))
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor=color_segregation_rate, facecolor='none', hatch='---', alpha=annot_alpha))
 
-    if(plot_transfer_rate_donor):
+    if(hatch_transfer_rate_donor):
         transfer_rate_donor = type_set._params['transfer_rate_donor'].values(force_type_dim=True, force_trait_dim=True)
         for u in range(transfer_rate_donor.shape[0]):
             for i in range(transfer_rate_donor.shape[1]):
                 if(transfer_rate_donor[u, i] != 0):
-                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='mediumpurple', facecolor='none', hatch='///', alpha=0.5))
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor=color_transfer_rate_donor, facecolor='none', hatch='///', alpha=annot_alpha))
 
-    if(plot_transfer_rate_recip):
+    if(hatch_transfer_rate_recip):
         transfer_rate_recip = type_set._params['transfer_rate_recip'].values(force_type_dim=True, force_trait_dim=True)
         for u in range(transfer_rate_recip.shape[0]):
             for i in range(transfer_rate_recip.shape[1]):
                 if(transfer_rate_recip[u, i] != 0):
-                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor='orchid', facecolor='none', hatch='\\\\\\', alpha=0.5))
+                    ax.add_patch(matplotlib.patches.Rectangle((i, u), 1, 1, linewidth=1, edgecolor=color_transfer_rate_recip, facecolor='none', hatch='\\\\\\', alpha=annot_alpha))
 
     for u in range(traits.shape[0]):
         for i in range(traits.shape[1]):
@@ -395,53 +276,58 @@ def attributes_plot(type_set, ax=None, plot_traits=True, plot_consumption_rate=T
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineageIDs=True, show_phenotypes=True, annot_extinct=False,
-                   type_colors=None, palette='hls', root_color='#AAAAAA', highlight_clades='all', apply_palette_depth=1, shuffle_palette=True, 
-                   color_step_start=0.13, color_step_slope=0.01, color_step_min=0.01):
-    
+def phylogeny_plot(community, ax=None, y_axis='index', log_x_axis=True, annot_lineageIDs=True, annot_traits=False, annot_extinct=True,
+                   type_colors=None, base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1,
+                   palette='hls', palette_depth=0, shuffle_palette=True, color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark', seed=None,
+                   linewidth=1, annot_fontsize=8):
+
     if(type_colors is None):
-        type_colors = color_types_by_phylogeny(system.type_set, palette=palette, root_color=root_color, highlight_clades=highlight_clades, apply_palette_depth=apply_palette_depth, shuffle_palette=shuffle_palette, color_step_start=color_step_start, color_step_slope=color_step_slope, color_step_min=color_step_min)
+        type_colors = type_styles_by_phylogeny(community.type_set, base_color=base_color, clade_colors=clade_colors, color_tags=color_tags, hatch_tags=hatch_tags, vmin=vmin, vmax=vmax,
+                                               palette=palette, palette_depth=palette_depth, shuffle_palette=shuffle_palette, seed=seed,
+                                               color_step_min=color_step_min, color_step_max=color_step_max, color_step_scale=color_step_scale, color_step_dir=color_step_dir)
     
     ax = plt.axes() if ax is None else ax
     
-    for i in range(system.num_types)[::-1]:
+    for i in range(community.num_types)[::-1]:
         
         try:
             
-            abd_series = system.N_series[i, :]
+            abd_series = community.N_series[i, :]
         
             tidx_birth = (abd_series != 0).argmax(axis=0)
-            t_birth    = system.t_series[tidx_birth]
+            t_birth    = community.t_series[tidx_birth]
 
             tidx_death = np.nonzero(abd_series)[0][-1]
-            t_death    = system.t_series[tidx_death]
+            t_death    = community.t_series[tidx_death]
 
-            parent_idx = system.type_set.parent_indices[i]
+            progenitor_index, progenitor_class = community.type_set.get_progenitor_indices(i, return_progenitor_class=True)
+            progenitor_index = progenitor_index[0]
+            progenitor_class = progenitor_class[0]
+            donor_index = community.type_set.transfer_donor_indices[i]
 
-            N_total_end = np.sum(system.N_series[:, -1])
-            N_i_end     = system.N_series[i, -1]
+            N_total_end = np.sum(community.N_series[:, -1])
+            N_i_end     = community.N_series[i, -1]
             
-            ypos_i      = system.type_set.energy_costs[i] if y_axis == 'cost' else -i
-            ypos_parent = system.type_set.energy_costs[parent_idx] if y_axis == 'cost' else -parent_idx
-            
-            ax.plot([t_birth, t_death], [ypos_i, ypos_i], color=type_colors[i], lw=0.5) 
+            ypos_i      = community.type_set.energy_costs[i] if y_axis == 'cost' else -i
 
-            if(parent_idx is not None):
-                ax.plot([t_birth, t_birth], [ypos_parent, ypos_i], color=type_colors[parent_idx], ls='--', lw=0.5, zorder=-99)
+            ax.plot([t_birth, t_death], [ypos_i, ypos_i], color=type_colors[i], lw=linewidth)
+
+            if(progenitor_index is not None):
+                ypos_parent = community.type_set.energy_costs[progenitor_index] if y_axis == 'cost' else -progenitor_index
+
+                ax.plot([t_birth, t_birth], [ypos_parent, ypos_i], color=type_colors[donor_index if donor_index is not None else progenitor_index], ls='--', lw=linewidth, zorder=-99)
 
             if(N_i_end > 0 or annot_extinct):
                 
                 if(N_i_end > 0):
-                    ax.plot([t_death, t_death+t_death*0.2], [ypos_i, ypos_i], color='#999999', ls=':', lw=0.5)
-                    ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90)
+                    # ax.plot([t_death, t_death+t_death*0.2], [ypos_i, ypos_i], color='#999999', ls=':', lw=linewidth) # <-- this is the dashed line to annotations for surviving types
+                    # ax.scatter(t_death+t_death*0.2, ypos_i, color=type_colors[i], s=1000*(N_i_end/N_total_end), zorder=90) # <-- this is the end dot scaled to abundance
+                    ax.scatter(t_death, ypos_i, color=type_colors[i], s=10, zorder=90)
                 
-                if(show_lineageIDs):
-
-                    ax.annotate(system.type_set.lineageIDs[i] 
-                                    + ('  ' + ''.join(['X' if system.type_set.sigma[i][j] > 0 else '-' for j in range(system.type_set.num_traits)]) if show_phenotypes else '')
-                                    + ('  ' + "{0:.6f}".format(system.type_set.xi.ravel()[i] if isinstance(system.type_set.xi, np.ndarray) else system.type_set.xi ))
-                                    , 
-                                xy=(t_death+t_death*0.35, ypos_i), color=type_colors[i], fontsize=2, xycoords='data', annotation_clip=False)
+                if(annot_lineageIDs):
+                    ax.annotate(community.type_set.lineageIDs[i]
+                                    + (f"    [{''.join(['1' if community.type_set.traits[i][j] > 0 else '0' for j in range(community.type_set.num_traits)])}]" if annot_traits else ''),
+                                xy=(t_death+t_death*0.1, ypos_i-0.0), va='center', color=type_colors[i], fontsize=annot_fontsize, xycoords='data', annotation_clip=False)
 
         except:
             pass
@@ -456,33 +342,35 @@ def phylogeny_plot(system, ax=None, y_axis='index', log_x_axis=True, show_lineag
     ax.spines['right'].set_visible(False)
     ax.spines['left'].set_visible(False)
 
+    ax.grid(False)
+
     plt.tight_layout()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def resource_plot(system, ax=None, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False, stacked=False, relative=False, resource_colors=None, palette='terrain', linewidth=None, edgecolor=None, legend=True):
+def resource_plot(community, ax=None, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False, stacked=False, relative=False, resource_colors=None, palette='terrain', linewidth=None, edgecolor=None, legend=True):
 
     if(t_max is None):
-        t_max = np.max(system.t_series)
+        t_max = np.max(community.t_series)
 
     if(t_downsample == 'default'):
-        t_downsample = max(int((len(system.t_series)//10000)+1), 1)
+        t_downsample = max(int((len(community.t_series)//10000)+1), 1)
     elif(t_downsample is None):
         t_downsample = 1
 
-    resource_colors = sns.color_palette(palette, system.num_resources) if resource_colors is None else resource_colors
+    resource_colors = sns.color_palette(palette, community.num_resources) if resource_colors is None else resource_colors
     
     ax = plt.axes() if ax is None else ax
 
     if(stacked):
         if(relative):
-            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip((system.R_series/np.sum(system.R_series, axis=0))[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=resource_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+            ax.stackplot(community.t_series[community.t_series < t_max][::t_downsample], np.flip((community.R_series/np.sum(community.R_series, axis=0))[:, community.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=resource_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
         else:
-            ax.stackplot(system.t_series[system.t_series < t_max][::t_downsample], np.flip(system.R_series[:, system.t_series < t_max][:, ::t_downsample], axis=0), baseline='sym', colors=resource_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+            ax.stackplot(community.t_series[community.t_series < t_max][::t_downsample], np.flip(community.R_series[:, community.t_series < t_max][:, ::t_downsample], axis=0), baseline='sym', colors=resource_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
     else:
-        for i in range(system.num_resources):
-            ax.plot(system.t_series[system.t_series < t_max][::t_downsample], system.R_series[:, system.t_series < t_max][i, ::t_downsample], color=resource_colors[i], label=f"resource {i+1}")
+        for i in range(community.num_resources):
+            ax.plot(community.t_series[community.t_series < t_max][::t_downsample], community.R_series[:, community.t_series < t_max][i, ::t_downsample], color=resource_colors[i], label=f"resource {i+1}")
         if(legend):
             ax.legend()
 
@@ -491,14 +379,16 @@ def resource_plot(system, ax=None, t_max=None, t_downsample='default', log_x_axi
     if(log_y_axis):
         ax.set_yscale('log')
 
+    ax.grid(False)
+
     return ax
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def Lstar_types_plot(system, ax=None, figsize=(7,5)):
+def Lstar_types_plot(community, ax=None, figsize=(7,5)):
     import ecoevocrm.coarse_graining as cg
-    Lstar_types_data = cg.get_Lstar_types(system)
+    Lstar_types_data = cg.get_Lstar_types(community)
 
     ax = plt.axes() if ax is None else ax
 
