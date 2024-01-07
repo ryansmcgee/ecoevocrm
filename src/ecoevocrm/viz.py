@@ -62,7 +62,8 @@ def lightdark_cmap(color, cmin=0, cmax=1, steps=256, reverse=False):
 
 def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1,
                               palette='hls', palette_depth=0, shuffle_palette=True, seed=None,
-                              color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark'):
+                              color_step_mode=None, color_step_dir='random', color_step_start=0.13, color_step_slope=0.01,
+                              color_step_min=0.01, color_step_max=0.25, color_step_scale=1):
 
     _rng = np.random.default_rng(seed)
 
@@ -95,6 +96,8 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
                         break
 
     #------------------------
+
+    color_step_mode = color_step_mode if color_step_mode is not None else 'depth' if not clade_colors else 'cost'
 
     def color_clade(d, parent_color, depth, next_palette_color_idx):
         if(not isinstance(d, dict) or not d):
@@ -130,8 +133,17 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
                     type_cmap  = parent_color
                     type_color = type_cmap( (type_cost - vmin)/(vmax - vmin) )  # here parent_color is a cmap
                 else:
-                    color_step = min(max(cost_diff, color_step_min), color_step_max)
+                    if(color_step_mode == 'depth'):
+                        # color_step_scale = max(color_step_start - color_step_slope*(depth-1), color_step_min)
+                        # type_color = tuple([np.clip((parent_color_rgb[0] + np.random.uniform(low=-1*color_step_scale, high=color_step_scale)), 0, 1)]*3)
+                        color_step = min(max(_rng.uniform(low=0, high=color_step_start-color_step_slope*(depth-1)), color_step_min), color_step_max)
+                    elif(color_step_mode == 'cost'):
+                        color_step = min(max(cost_diff, color_step_min), color_step_max)
+                    else:
+                        color_step       = 0
+                    # - - - -
                     color_step_coeff = -color_step_scale if color_step_dir == 'dark' else color_step_scale if color_step_dir == 'light' else _rng.choice([-color_step_scale, color_step_scale])
+                    # - - - -
                     if(depth < palette_depth):
                         type_color = tuple([np.clip((parent_color[0] + color_step_coeff*color_step), 0, 1)]*3)
                     else:
@@ -164,8 +176,9 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, relative_abundance=False, stacked=True, baseline='sym', t_max=None, t_downsample='default', log_x_axis=False,
-                   base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1, palette='hls', palette_depth=0, shuffle_palette=True, color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark', seed=None,
+def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, relative_abundance=False, stacked=True, baseline='sym', t_min=0, t_max=None, t_downsample='default', log_x_axis=False,
+                   base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1, palette='hls', palette_depth=0, shuffle_palette=True,
+                   color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='random', seed=None,
                    linewidth=None, edgecolor=None):
 
     if(type_colors is None or type_hatches is None):
@@ -185,11 +198,18 @@ def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, rela
 
     ax = plt.axes() if ax is None else ax
 
+    t_mask = (t_min <= community.t_series) & (community.t_series <= t_max)
+    t_series = community.t_series[t_mask][::t_downsample]
+    if(relative_abundance):
+        N_series = (community.N_series/np.sum(community.N_series, axis=0))[:, t_mask][:, ::t_downsample]
+    else:
+        N_series = community.N_series[:, t_mask][:, ::t_downsample]
+
     if(stacked):
         if(relative_abundance):
-            stacks = ax.stackplot(community.t_series[community.t_series < t_max][::t_downsample], np.flip((community.N_series/np.sum(community.N_series, axis=0))[:, community.t_series < t_max][:, ::t_downsample], axis=0), baseline='zero', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+            stacks = ax.stackplot(t_series, np.flip(N_series, axis=0), baseline='zero', colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
         else:
-            stacks = ax.stackplot(community.t_series[community.t_series < t_max][::t_downsample], np.flip(community.N_series[:, community.t_series < t_max][:, ::t_downsample], axis=0), baseline=baseline, colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
+            stacks = ax.stackplot(t_series, np.flip(N_series, axis=0), baseline=baseline, colors=type_colors[::-1], linewidth=linewidth, edgecolor=edgecolor)
 
         if(type_hatches is not None):
             for stack, hatch in zip(stacks, type_hatches[::-1]):
@@ -197,12 +217,14 @@ def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, rela
 
     else:
         for u in range(community.num_types):
-            ax.plot(community.t_series[community.t_series < t_max][::t_downsample], community.N_series[:, community.t_series < t_max][u, ::t_downsample], color=type_colors[u])
+            ax.plot(t_series, N_series[u], color=type_colors[u])
 
     if(log_x_axis):
         ax.set_xscale('log')
 
     ax.grid(False)
+
+    plt.tight_layout()
 
     return ax
 
@@ -219,6 +241,11 @@ def attributes_plot(type_set, ax=None, show_traits=True, type_colors=None, trait
     ax.set_xlim(0, type_set.num_traits)
     ax.set_aspect('equal')
     ax.set_ylim(ax.get_ylim()[::-1])
+
+    ax.set_xticks([i+0.5 for i in range(type_set.num_traits)])
+    ax.set_yticks([i+0.5 for i in range(type_set.num_types)])
+    ax.set_xticklabels([i for i in range(type_set.num_traits)])
+    ax.set_yticklabels([i for i in range(type_set.num_types)])
 
     _type_colors  = None
     _trait_colors = None
@@ -278,7 +305,7 @@ def attributes_plot(type_set, ax=None, show_traits=True, type_colors=None, trait
 
 def phylogeny_plot(community, ax=None, y_axis='index', log_x_axis=True, annot_lineageIDs=True, annot_traits=False, annot_extinct=True,
                    type_colors=None, base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1,
-                   palette='hls', palette_depth=0, shuffle_palette=True, color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='dark', seed=None,
+                   palette='hls', palette_depth=0, shuffle_palette=True, color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='random', seed=None,
                    linewidth=1, annot_fontsize=8):
 
     if(type_colors is None):
@@ -482,11 +509,11 @@ def strainpool_plot(strainpool_system, type_weights, rank_cutoff=None, weight_cu
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def interp_series_plot(interp, t_vals, ax=None):
+def interp_series_plot(interp, t_vals, ax=None, colors=None):
     L = interp(0).shape[0]
     ax = plt.axes() if ax is None else ax
     for i in range(L):
-        ax.plot(t_vals, interp(t_vals)[i, :]) 
+        ax.plot(t_vals, interp(t_vals)[i, :], c=colors[i] if colors is not None else None)
     ax.set_ylim(ymin=min(0, np.min(interp(t_vals))))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

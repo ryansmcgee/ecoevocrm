@@ -188,7 +188,7 @@ class TypeSet():
 
     @property
     def cost_landscape_bytype(self):
-        return [self._cost_landscape[k] for k in self.trait_keys]
+        return [self._cost_landscape[k] for k in self.trait_keys] if self._cost_landscape is not None else 0
 
     @property
     def mutation_rate(self):
