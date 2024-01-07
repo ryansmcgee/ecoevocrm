@@ -1,5 +1,5 @@
 # ecoevocrm directories to ignore
-#demos/
+#notebooks/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
