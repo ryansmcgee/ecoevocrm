@@ -176,7 +176,7 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, relative_abundance=False, stacked=True, baseline='sym', t_min=0, t_max=None, t_downsample='default', log_x_axis=False,
+def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, relative_abundance=False, stacked=True, baseline='sym', t_min=0, t_max=None, t_downsample='default', log_x_axis=False, log_y_axis=False,
                    base_color='#AAAAAA', clade_colors=None, color_tags=None, hatch_tags=None, vmin=0, vmax=1, palette='hls', palette_depth=0, shuffle_palette=True,
                    color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='random', seed=None,
                    linewidth=None, edgecolor=None):
@@ -221,6 +221,8 @@ def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, rela
 
     if(log_x_axis):
         ax.set_xscale('log')
+    if(log_y_axis):
+        ax.set_yscale('log')
 
     ax.grid(False)
 

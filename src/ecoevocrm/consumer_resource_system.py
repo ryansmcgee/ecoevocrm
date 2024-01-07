@@ -365,7 +365,8 @@ class Community():
 
         #------------------------------
 
-        mean_fitness     = np.mean(growth_rate[:num_types])
+        # mean_fitness     = np.mean(growth_rate[:num_types])
+        mean_fitness = np.sum(N_t[:num_types]/N_t[:num_types].sum() * growth_rate[:num_types])
         dTotalPropensity = 0
 
         if(num_mutants > 0):
