@@ -344,7 +344,8 @@ def phylogeny_plot(community, ax=None, y_axis='index', log_x_axis=True, annot_li
             if(progenitor_index is not None):
                 ypos_parent = community.type_set.energy_costs[progenitor_index] if y_axis == 'cost' else -progenitor_index
 
-                ax.plot([t_birth, t_birth], [ypos_parent, ypos_i], color=type_colors[donor_index if donor_index is not None else progenitor_index], ls='--', lw=linewidth, zorder=-99)
+                ax.plot([t_birth, t_birth], [ypos_parent, ypos_i], color=type_colors[donor_index if donor_index is not None else progenitor_index],
+                        ls=':' if progenitor_class == 'segregation' else (0, (5,1)) if progenitor_class == 'transfer' else '-', lw=linewidth, zorder=-99)
 
             if(N_i_end > 0 or annot_extinct):
                 
