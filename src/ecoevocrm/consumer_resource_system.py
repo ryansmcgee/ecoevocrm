@@ -278,6 +278,9 @@ class Community():
             # Get the params for the dynamics:
             params = self.get_dynamics_params(type_index=self._active_type_indices)
 
+            # if(t_span[0] > 165.0):
+            #     print("uhhh")
+
             # Draw a random propensity threshold for triggering the next Gillespie event:
             self.threshold_event_propensity = np.random.exponential(1)
 
