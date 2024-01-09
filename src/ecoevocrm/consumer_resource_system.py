@@ -278,9 +278,6 @@ class Community():
             # Get the params for the dynamics:
             params = self.get_dynamics_params(type_index=self._active_type_indices)
 
-            # if(t_span[0] > 165.0):
-            #     print("uhhh")
-
             # Draw a random propensity threshold for triggering the next Gillespie event:
             self.threshold_event_propensity = np.random.exponential(1)
 
@@ -712,11 +709,18 @@ class Community():
             self.type_set.segregant_indices[new_type_idx] = new_segregant_indices
             # - - - -
             new_transconjugants_newtypeasdonor = self.type_set.generate_transconjugant_set(donor_index=new_type_idx, update_transconjugant_indices=False)
+            new_transconjugant_indices_newtypeasdonor = self.transconjugant_set.add_type(new_transconjugants_newtypeasdonor)
+            for xconj_idx, donor_idx in zip(new_transconjugant_indices_newtypeasdonor, new_transconjugants_newtypeasdonor.transfer_donor_indices):
+                self.type_set.transconjugant_indices_bydonor[donor_idx].append(xconj_idx)
+            for xconj_idx, recip_idx in zip(new_transconjugant_indices_newtypeasdonor, new_transconjugants_newtypeasdonor.transfer_recip_indices):
+                self.type_set.transconjugant_indices_byrecip[recip_idx].append(xconj_idx)
+            # - - - -
             new_transconjugants_newtypeasrecip = self.type_set.generate_transconjugant_set(recip_index=new_type_idx, update_transconjugant_indices=False)
-            new_transconjugant_indices_bydonor = self.transconjugant_set.add_type(new_transconjugants_newtypeasdonor)
-            new_transconjugant_indices_byrecip = self.transconjugant_set.add_type(new_transconjugants_newtypeasrecip)
-            self.type_set.transconjugant_indices_bydonor[new_type_idx] = new_transconjugant_indices_bydonor
-            self.type_set.transconjugant_indices_byrecip[new_type_idx] = new_transconjugant_indices_byrecip
+            new_transconjugant_indices_newtypeasrecip = self.transconjugant_set.add_type(new_transconjugants_newtypeasrecip)
+            for xconj_idx, donor_idx in zip(new_transconjugant_indices_newtypeasrecip, new_transconjugants_newtypeasrecip.transfer_donor_indices):
+                self.type_set.transconjugant_indices_bydonor[donor_idx].append(xconj_idx)
+            for xconj_idx, recip_idx in zip(new_transconjugant_indices_newtypeasrecip, new_transconjugants_newtypeasrecip.transfer_recip_indices):
+                self.type_set.transconjugant_indices_byrecip[recip_idx].append(xconj_idx)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

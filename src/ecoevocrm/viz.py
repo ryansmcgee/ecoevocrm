@@ -87,13 +87,18 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
             for lineage_id in type_set.lineageIDs:
                 lineage_id_lastpart = lineage_id.split('.')[-1].split('[')[0].split('(')[0]
                 for tag in color_tags.keys():
-                    if(tag in lineage_id_lastpart):
-                        if(isinstance(color_tags[tag], dict)):
+                    if(isinstance(color_tags[tag], dict)):
+                        if(tag in lineage_id):
                             tag_count = lineage_id.count(tag)
                             clade_colors[lineage_id] = color_tags[tag][tag_count]
-                        else:
+                            break
+                    else:
+                        if(tag in lineage_id_lastpart):
                             clade_colors[lineage_id] = color_tags[tag]
-                        break
+                            break
+
+
+
 
     #------------------------
 

@@ -407,6 +407,8 @@ class TypeSet():
                 if(self.traits[donor_idx][i] != 0):
                     # Iterate over potential recipient types:
                     for r, recip_idx in enumerate(recip_indices):
+                        if(recip_idx == donor_idx):
+                            continue
                         transfer_rate_recip   = self._params['transfer_rate_recip'].get_type(recip_idx, values_only=True)
                         transfer_rate_recip_i = transfer_rate_recip[i] if transfer_rate_recip.ndim == 1 else transfer_rate_recip
                         if(self.traits[recip_idx][i] == 0 and transfer_rate_recip_i > 0):
