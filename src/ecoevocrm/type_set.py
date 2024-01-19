@@ -546,7 +546,7 @@ class TypeSet():
             progenitor_index  = self.transfer_recip_indices[type_index]
             donor_index       = self.transfer_donor_indices[type_index]
             progeny_id_prefix = 't'
-            progeny_id_suffix = f'(d{self.lineageIDs[donor_index]})'
+            progeny_id_suffix = f"(d{self.lineageIDs[donor_index].replace('.', '-')})"
         else:
             progenitor_index  = None
             progeny_id_prefix = None
