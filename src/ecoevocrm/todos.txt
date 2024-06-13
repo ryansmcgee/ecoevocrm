@@ -1,0 +1,4 @@
+cumulate individual mutants/segregants/etc
+segregation in dN/dt
+segregant overrides same structure as transconjugant_overrides
+plot for growth rates over time

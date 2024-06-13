@@ -71,7 +71,7 @@ chi = 0.3
 # Set the trait interaction costs by defining a matrix, $\\J_{ij}$, that encodes the cost for each pair of traits:
 
 # J = None
-J = utils.random_matrix((num_resources, num_resources), 'tikhonov_sigmoid', args={'n_star': 5, 'delta': 1}, triangular=True, diagonal=0, 
+J = utils.random_matrix((num_resources, num_resources), 'tikhonov_sigmoid', args={'n_star': 5, 'delta': 1}, triangular=True, diagonal=0,
                         seed=2)
 viz.matrix_plot(J, vmin=-0.4, vmax=0.4)
 
@@ -106,11 +106,11 @@ resource_dynamics_mode='fasteq'
 
 # ## Simulate model
 
-system = ConsumerResourceSystem(type_set=TypeSet(sigma=sigma, xi=xi, chi=chi, J=J, binarize_traits_J_cost_terms=True, mu=1e-10), 
-                                rho=rho, tau=tau,
-                                N_init=N_init, R_init=R_init, 
-                                resource_dynamics_mode='explicit', 
-                                max_time_step=1e3)
+system = Community(type_set=TypeSet(sigma=sigma, xi=xi, chi=chi, J=J, binarize_traits_J_cost_terms=True, mu=1e-10),
+                   rho=rho, tau=tau,
+                   N_init=N_init, R_init=R_init,
+                   resource_dynamics_mode='explicit',
+                   max_time_step=1e3)
 
 
 T_total = 1e6

@@ -12,42 +12,36 @@ class ResourceSet():
     RESOURCE_INFLUX_CONSTANT          = 0
     RESOURCE_INFLUX_TEMPORAL          = 1
 
-    def __init__(self, num_resources = None,
-                       rho           = 0,
-                       tau           = 1,
-                       omega         = 1,
-                       alpha         = 0,
-                       theta         = 0,
-                       phi           = 0,
-                       D             = None ):
+    def __init__(self, num_resources    = None,
+                       influx_rate      = 1,
+                       decay_rate       = 1,
+                       energy_content   = 1,
+                       cross_production = None ):
 
         # Determine the number of resources:
-        if(isinstance(rho, (list, np.ndarray))):
-            self.num_resources = len(rho)
-        elif(isinstance(rho, scipy.interpolate.interpolate.interp1d)):
-            self.num_resources = len(rho(0).ravel())
-        elif(isinstance(omega, (list, np.ndarray))):
-            self.num_resources = len(omega)
-        elif(isinstance(tau, (list, np.ndarray))):
-            self.num_resources = len(tau)
+        if(isinstance(influx_rate, (list, np.ndarray))):
+            self.num_resources = len(influx_rate)
+        elif(isinstance(influx_rate, scipy.interpolate.interpolate.interp1d)):
+            self.num_resources = len(influx_rate(0).ravel())
+        elif(isinstance(energy_content, (list, np.ndarray))):
+            self.num_resources = len(energy_content)
+        elif(isinstance(decay_rate, (list, np.ndarray))):
+            self.num_resources = len(decay_rate)
         elif(num_resources is not None):
             self.num_resources  = num_resources
         else:
-            utils.error("Error in ResourceSet __init__(): Number of resources must be specified by providing a) a value for num_resources, or b) lists for rho/tau/omega.")
+            utils.error("Error in ResourceSet __init__(): Number of resources must be specified by providing a) a value for num_resources, or b) lists for influx_rate/decay_rate/energy_content.")
 
         # Initialize resource parameters:
-        if(isinstance(rho, scipy.interpolate.interpolate.interp1d)):
-            self._rho = rho
+        if(isinstance(influx_rate, scipy.interpolate.interpolate.interp1d)):
+            self._influx_rate = influx_rate
             self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_TEMPORAL
         else:
-            self._rho = utils.reshape(rho, shape=(1, self.num_resources)).ravel()
+            self._influx_rate = utils.reshape(influx_rate, shape=(1, self.num_resources)).ravel()
             self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_CONSTANT
-        self.tau   = utils.reshape(tau,   shape=(1, self.num_resources)).ravel()
-        self.omega = utils.reshape(omega, shape=(1, self.num_resources)).ravel()
-        self.alpha = utils.reshape(alpha, shape=(1, self.num_resources)).ravel()
-        self.theta = utils.reshape(theta, shape=(1, self.num_resources)).ravel()
-        self.phi   = utils.reshape(phi,   shape=(1, self.num_resources)).ravel()
-        self.D     = utils.reshape(D,     shape=(self.num_resources, self.num_resources)) if D is not None else None
+        self.decay_rate   = utils.reshape(decay_rate,   shape=(1, self.num_resources)).ravel()
+        self.energy_content = utils.reshape(energy_content, shape=(1, self.num_resources)).ravel()
+        self.cross_production     = utils.reshape(cross_production,     shape=(self.num_resources, self.num_resources)) if cross_production is not None else None
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -66,32 +60,32 @@ class ResourceSet():
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     @property
-    def M(self):
-        # M_ij = D_ij * w_j/w_i
-        if(self.D is not None):
-            W = np.tile(self.omega, (self.num_resources, 1))
-            return self.D * W/W.T
+    def cross_production_energy(self):
+        # M_ij = D_ij * energycontent_j/energycontent_i
+        if(self.cross_production is not None):
+            W = np.tile(self.energy_content, (self.num_resources, 1))
+            return self.cross_production * W/W.T
         else:
             return None
 
     @property
-    def rho(self):
-        return self._rho
+    def influx_rate(self):
+        return self._influx_rate
 
-    @rho.setter
-    def rho(self, vals):
+    @influx_rate.setter
+    def influx_rate(self, vals):
         if(isinstance(vals, scipy.interpolate.interpolate.interp1d)):
-            self._rho = vals
+            self._influx_rate = vals
             self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_TEMPORAL
         else:
-            self._rho = utils.reshape(vals, shape=(1, self.num_resources)).ravel()
+            self._influx_rate = utils.reshape(vals, shape=(1, self.num_resources)).ravel()
             self.resource_influx_mode = ResourceSet.RESOURCE_INFLUX_CONSTANT
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def get_resource_id(self, index):
-        return hash((self._rho[index], self.tau[index], self.omega[index], self.alpha[index], self.theta[index], self.phi[index]))
+        return hash((self._influx_rate[index], self.decay_rate[index], self.energy_content[index]))
 
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -101,24 +95,18 @@ class ResourceSet():
         resource_idx = np.where(self.resource_ids==resource_id)[0] if resource_id is not None else index
         if(resource_idx is None):
             return {'num_resources': self.num_resources,
-                    'rho':           self._rho,
-                    'tau':           self.tau,
-                    'omega':         self.omega,
-                    'alpha':         self.alpha,
-                    'theta':         self.theta,
-                    'phi':           self.phi,
-                    'M':             self.M}
-            # return (self.num_resources, self._rho, self.tau, self.omega, self.D)
+                    'influx_rate':           self._influx_rate,
+                    'decay_rate':           self.decay_rate,
+                    'energy_content':         self.energy_content,
+                    'cross_production_energy':             self.cross_production_energy}
+            # return (self.num_resources, self._influx_rate, self.decay_rate, self.energy_content, self.cross_production)
         else:
             return {'num_resources': 1,
-                    'rho':           self._rho[resource_idx],
-                    'tau':           self.tau[resource_idx],
-                    'omega':         self.omega[resource_idx],
-                    'alpha':         self.alpha[resource_idx],
-                    'theta':         self.theta[resource_idx],
-                    'phi':           self.phi[resource_idx],
-                    'M':             self.M[resource_idx,:]}
-            # return (1, self._rho[resource_idx], self.tau[resource_idx], self.omega[resource_idx], self.D[resource_idx, :])
+                    'influx_rate':           self._influx_rate[resource_idx],
+                    'decay_rate':           self.decay_rate[resource_idx],
+                    'energy_content':         self.energy_content[resource_idx],
+                    'cross_production_energy':             self.cross_production_energy[resource_idx, :]}
+            # return (1, self._influx_rate[resource_idx], self.decay_rate[resource_idx], self.energy_content[resource_idx], self.cross_production[resource_idx, :])
         
 
 
