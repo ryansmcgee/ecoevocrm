@@ -1,8 +1,8 @@
 import numpy as np
 import scipy
 #------------------------------
-import portal.utils as utils
-import portal.matrices as matrices
+#import portal.utils as utils
+#import portal.matrices as matrices
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
