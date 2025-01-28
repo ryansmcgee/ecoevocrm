@@ -469,7 +469,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, added_type_set):
+    def add_type(self, added_type_set, keep_lineage_ids=False):
         if(not isinstance(added_type_set, TypeSet)):
             utils.error(f"Error in TypeSet add_type(): type_set argument expects object of TypeSet type.")
         #----------------------------------
@@ -478,13 +478,23 @@ class TypeSet():
             return added_type_indices
         #----------------------------------
         # Check that the type set dimensions match the system dimensions:
-        if(self.num_traits != added_type_set.num_traits): 
+        if(self.num_traits != added_type_set.num_traits and self.num_traits != 0):
             utils.error(f"Error in TypeSet add_type(): The number of traits for added types ({added_type_set.num_traits}) does not match the number of type set traits ({self.num_traits}).")
         #----------------------------------
         added_type_indices = list(range(self.num_types, self.num_types+added_type_set.num_types))
         #----------------------------------
-        self._traits = self._traits.add(added_type_set.traits)
+        if(self._traits is None or self._traits.shape[0]==0 and self.traits.shape[1]==0):
+            self._traits = added_type_set._traits
+        else:
+            self._traits = self._traits.add(added_type_set.traits)
+        #----------------------------------
         for param, param_vals in self._params.items():
+            # _ = self._params[param]
+            # __ = added_type_set._params[param]
+            # if(_.shape is None):
+            #     pass
+            # if(__.shape is None):
+            #     pass
             self._params[param] = utils.SystemParameter.combine(self._params[param], added_type_set._params[param])
         #----------------------------------
         self._creation_rate  = [rate for ratelist in [self._creation_rate, added_type_set._creation_rate] for rate in ratelist] if self._creation_rate is not None else None
@@ -525,8 +535,9 @@ class TypeSet():
             self._typeIDs = [tid for idlist in [self._typeIDs, added_type_set.typeIDs] for tid in idlist]
         #----------------------------------
         if(self._lineageIDs is not None):
-            for i in range((self.num_types-1), (self.num_types-1)+added_type_set.num_types):
-                added_lineage_id = self.add_type_to_phylogeny(type_index=i)
+            # for _i, i in enumerate(range((self.num_types-1), (self.num_types-1)+added_type_set.num_types)):
+            for _i, i in enumerate(range(self.num_types-added_type_set.num_types, self.num_types)):
+                added_lineage_id = self.add_type_to_phylogeny(type_index=i, lineage_id=(added_type_set.lineageIDs[_i] if keep_lineage_ids else None))
                 self._lineageIDs.append(added_lineage_id)
         #----------------------------------
         return added_type_indices
@@ -578,7 +589,7 @@ class TypeSet():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_type(self, type_index=None):
+    def get_type(self, type_index=None, keep_progenitor_indices=True, keep_lineage_ids=False):
         type_idx = utils.treat_as_list(type_index) if type_index is not None else None
         if(type_idx is None):
             utils.error(f"Error in TypeSet get_type(): A type index or type id must be given.")
@@ -600,12 +611,13 @@ class TypeSet():
                         mutant_overrides           = self.mutant_overrides,
                         segregant_overrides        = self.segregant_overrides,
                         transconjugant_overrides   = self.transconjugant_overrides,
-                        mutation_parent_indices    = self.mutation_parent_indices[type_idx],
-                        segregation_parent_indices = self.segregation_parent_indices[type_idx],
-                        transfer_donor_indices     = self.transfer_donor_indices[type_idx],
-                        transfer_recip_indices     = self.transfer_recip_indices[type_idx],
+                        mutation_parent_indices    = self.mutation_parent_indices[type_idx] if keep_progenitor_indices else None,
+                        segregation_parent_indices = self.segregation_parent_indices[type_idx] if keep_progenitor_indices else None,
+                        transfer_donor_indices     = self.transfer_donor_indices[type_idx] if keep_progenitor_indices else None,
+                        transfer_recip_indices     = self.transfer_recip_indices[type_idx] if keep_progenitor_indices else None,
+                        lineageIDs                 = [self.lineageIDs[i] for i in type_idx] if keep_lineage_ids else None,
                         binarize_trait_costs       = self.binarize_trait_costs,
-                        binarize_interaction_costs = self.binarize_interaction_costs )
+                        binarize_interaction_costs = self.binarize_interaction_costs)
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

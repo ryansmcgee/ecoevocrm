@@ -192,7 +192,12 @@ def merge_landscapes(dict_A, dict_B, prefix_A='', prefix_B='', suffix_A='', suff
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def mutsel_equilibrium(landscape, mutation_rate, max_mutation_step=1):
-    
+    # ~ ~ ~ ~
+    # Reference:
+    # Hermisson, Joachim, et al. "Mutation–selection balance: ancestry, load, and maximum principle."
+    # Theoretical population biology 62.1 (2002): 9-46.
+    # ~ ~ ~ ~
+
     R = np.diag(landscape.fitnesses)
     R_mean = np.identity(R.shape[0]) * np.mean(landscape.fitnesses)
     

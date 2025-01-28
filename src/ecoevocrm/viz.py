@@ -70,7 +70,7 @@ def type_styles_by_phylogeny(type_set, base_color='#AAAAAA', clade_colors=None, 
     num_palette_types = 0
     lineageIDs = np.asarray(type_set.lineageIDs)
     for lineage_id in lineageIDs:
-        if(lineage_id.count('.') == palette_depth):
+        if(lineage_id.count('.') <= palette_depth):
             num_palette_types += 1
 
     palette = sns.color_palette(palette, num_palette_types)

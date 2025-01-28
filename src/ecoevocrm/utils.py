@@ -165,8 +165,11 @@ class SystemParameter():
 
     @staticmethod
     def combine(params_A, params_B, force_type_dim=False, force_trait_dim=False):
-        if(params_A is None and params_B is not None): return params_B
-        if(params_B is None and params_A is not None): return params_A
+        try:
+            if((params_A is None and params_B is not None) or (params_A._values is None and params_B._values is not None) or (0 in params_A.shape and not 0 in params_B.shape)): return params_B
+            if((params_B is None and params_A is not None) or (params_B._values is None and params_A._values is not None) or (0 in params_B.shape and not 0 in params_A.shape)): return params_A
+        except:
+            pass
         # - - - -
         if(params_A.num_traits != params_B.num_traits):
             error(f"Error in SystemParameter.add(): The params_B have a different num_traits ({params_B.num_traits}) than the base params ({params_A.num_traits})")

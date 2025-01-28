@@ -2,9 +2,12 @@
 # https://stackoverflux.com/questions/61983372/is-built-in-method-numpy-core-multiarray-umath-implement-array-function-a-per
 import os
 
+import numpy as np
+
 os.environ['NUMPY_EXPERIMENTAL_ARRAY_FUNCTION'] = '0'
 #----------------------------------
 import scipy.integrate
+import copy
 
 from ecoevocrm.type_set import *
 from ecoevocrm.resource_set import *
@@ -58,6 +61,7 @@ class Community():
                  resource_dynamics_mode      = 'explicit',
                  threshold_min_abs_abundance = 1,
                  convergent_lineages         = False,
+                 print_events                = True,
                  seed                        = None):
 
         #----------------------------------
@@ -140,8 +144,8 @@ class Community():
         #----------------------------------
         if(N_init is None or R_init is None):
             utils.error(f"Error in ConsumerResourceSystem __init__(): Values for N_init and R_init must be provided.")
-        self._N_series = utils.ExpandableArray(utils.reshape(N_init, shape=(system_num_types, 1)), alloc_shape=(max(self.resource_set.num_resources * 25, system_num_types), 1))
-        self._R_series = utils.ExpandableArray(utils.reshape(R_init, shape=(system_num_resources, 1)), alloc_shape=(self.resource_set.num_resources, 1))
+        self._N_series = utils.ExpandableArray(utils.reshape(np.array(N_init), shape=(system_num_types, 1)), alloc_shape=(max(self.resource_set.num_resources * 25, system_num_types), 1))
+        self._R_series = utils.ExpandableArray(utils.reshape(np.array(R_init), shape=(system_num_resources, 1)), alloc_shape=(self.resource_set.num_resources, 1))
 
         #----------------------------------
         # Initialize system time:
@@ -154,13 +158,14 @@ class Community():
         self.threshold_event_propensity  = None  # is updated in run()
         self.threshold_min_abs_abundance = threshold_min_abs_abundance
         self.convergent_lineages         = convergent_lineages
+        self.print_events                = print_events
 
-        self.resource_dynamics_mode = Community.RESOURCE_DYNAMICS_FASTEQ if resource_dynamics_mode == 'fasteq' \
-            else Community.RESOURCE_DYNAMICS_EXPLICIT if resource_dynamics_mode == 'explicit' \
-            else -1
+        self.resource_dynamics_mode = (
+            Community.RESOURCE_DYNAMICS_FASTEQ if (resource_dynamics_mode=='fasteq' or resource_dynamics_mode==Community.RESOURCE_DYNAMICS_FASTEQ)
+            else Community.RESOURCE_DYNAMICS_EXPLICIT if (resource_dynamics_mode=='explicit' or resource_dynamics_mode==Community.RESOURCE_DYNAMICS_EXPLICIT)
+            else -1 )
 
-        self.resource_crossfeeding_mode = Community.RESOURCE_CROSSFEEDING_NONE if np.all(
-            self.resource_set.cross_production == 0) or np.all(self.type_set.energy_passthru == 0) \
+        self.resource_crossfeeding_mode = Community.RESOURCE_CROSSFEEDING_NONE if np.all(self.resource_set.cross_production == 0) or np.all(self.type_set.energy_passthru == 0) \
             else Community.RESOURCE_CROSSFEEDING_HOMOTYPES if self.type_set.energy_passthru.ndim == 1 \
             else Community.RESOURCE_CROSSFEEDING_HETEROTYPES if self.type_set.energy_passthru.ndim == 2 \
             else -1
@@ -243,7 +248,9 @@ class Community():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def run(self, T, dt=None, reorder_types_by_phylogeny=True, integration_method='default', max_time_step=np.inf):
+    def run(self, T, dt=None, reorder_types_by_phylogeny=True, integration_method='default', max_time_step=np.inf, print_events=None):
+
+        self.print_events = print_events if print_events is not None else self.print_events
 
         t_start   = self.t
         t_end     = self.t + T
@@ -394,7 +401,10 @@ class Community():
             self.transconjugant_selcoeffs = self.transconjugant_fitnesses - mean_fitness
             self.transconjugant_selcoeffs[self.transconjugant_selcoeffs < 0] = 0
             # - - - -
+            # try:
             self.transfer_propensities = N_t[transfer_donor_indices] * N_t[transfer_recip_indices] * transconjugant_rates * self.transconjugant_fitnesses * self.transconjugant_selcoeffs
+            # except:
+            #     pass
             self.transfer_propensities[self.transfer_propensities < 0] = 0  # negative propensities due to negative growthrate or selcoeff are zeroed out
             # - - - -
             dTotalPropensity += np.sum(self.transfer_propensities)
@@ -621,7 +631,8 @@ class Community():
             # Remove corresonding abundance from the parent type (abundance is moved from parent to mutant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - mutant_abundance, 1))
         #----------------------------------
-        print(f"[ Mutant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {mutant.trait_keys[0]}\n", end="")
+        if(self.print_events):
+            print(f"[ Mutant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {mutant.trait_keys[0]}\n", end="")
         return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -653,7 +664,8 @@ class Community():
             # Remove corresonding abundance from the parent type (abundance is moved from parent to segregant):
             self.set_type_abundance(type_index=parent_idx, abundance=max(self.get_type_abundance(parent_idx) - segregant_abundance, 1))
         #----------------------------------
-        print(f"[ Segregant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {segregant.trait_keys[0]}\n", end="")
+        if(self.print_events):
+            print(f"[ Segregant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[parent_idx]} --> {segregant.trait_keys[0]}\n", end="")
         return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -662,12 +674,16 @@ class Community():
         # Pick the transconjugant that will be established with proababilities proportional to transconjugants' propensities for establishment:
         transconjugant_indices   = self.type_set.get_transconjugant_indices(self._active_type_indices)
         transconjugant_drawrates = self.transfer_propensities / np.sum(self.transfer_propensities)
+        # try:
         transconjugant_idx       = np.random.choice(transconjugant_indices, p=transconjugant_drawrates)
         # Retrieve the transconjugant and some of its properties:
         transconjugant           = self.transconjugant_set.get_type(transconjugant_idx)
         transconjugant_type_id   = transconjugant.typeIDs[0]
         transconjugant_fitness   = self.transconjugant_fitnesses[np.argmax(transconjugant_indices == transconjugant_idx)]
         transconjugant_abundance = np.maximum(1 / transconjugant_fitness, 1)
+        # except:
+        #     utils.error("dat error")
+        #     pass # debug only
         #----------------------------------
         # Get the index of the donor and recipient types associated with the selected transconjugant:
         donor_idx = transconjugant.transfer_donor_indices[0]
@@ -686,37 +702,38 @@ class Community():
             # Remove corresonding abundance from the recipient type (abundance is moved from recipient to transconjugant):
             self.set_type_abundance(type_index=recip_idx, abundance=max(self.get_type_abundance(recip_idx) - transconjugant_abundance, 1))
         #----------------------------------
-        print(f"[ Transconjugant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[donor_idx]}+{self.type_set.trait_keys[recip_idx]} --> {transconjugant.trait_keys[0]}\n", end="")
+        if(self.print_events):
+            print(f"[ Transconjugant established at t={self.t:.2f} ]\t{self.type_set.trait_keys[donor_idx]}+{self.type_set.trait_keys[recip_idx]} --> {transconjugant.trait_keys[0]}\n", end="")
         return
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def add_type(self, new_type_set=None, abundance=0):
+    def add_type(self, new_type_set=None, abundance=0, keep_lineage_ids=False):
         abundance = utils.treat_as_list(abundance)
         #----------------------------------
-        new_type_indices = self.type_set.add_type(new_type_set)
+        new_type_indices = self.type_set.add_type(new_type_set, keep_lineage_ids=keep_lineage_ids)
         #----------------------------------
         self._N_series = self._N_series.add(np.zeros(shape=(new_type_set.num_types, self.N_series.shape[1])))
         self.set_type_abundance(type_index=list(range(self.type_set.num_types - new_type_set.num_types, self.type_set.num_types)), abundance=abundance)
         #----------------------------------
         for new_type_idx in new_type_indices:
             new_mutants        = self.type_set.generate_mutant_set(new_type_idx, update_mutant_indices=False)
-            new_mutant_indices = self.mutant_set.add_type(new_mutants)
+            new_mutant_indices = self.mutant_set.add_type(new_mutants, keep_lineage_ids=keep_lineage_ids)
             self.type_set.mutant_indices[new_type_idx] = new_mutant_indices
             # - - - -
             new_segregants        = self.type_set.generate_segregant_set(new_type_idx, update_segregant_indices=False)
-            new_segregant_indices = self.segregant_set.add_type(new_segregants)
+            new_segregant_indices = self.segregant_set.add_type(new_segregants, keep_lineage_ids=keep_lineage_ids)
             self.type_set.segregant_indices[new_type_idx] = new_segregant_indices
             # - - - -
             new_transconjugants_newtypeasdonor = self.type_set.generate_transconjugant_set(donor_index=new_type_idx, update_transconjugant_indices=False)
-            new_transconjugant_indices_newtypeasdonor = self.transconjugant_set.add_type(new_transconjugants_newtypeasdonor)
+            new_transconjugant_indices_newtypeasdonor = self.transconjugant_set.add_type(new_transconjugants_newtypeasdonor, keep_lineage_ids=keep_lineage_ids)
             for xconj_idx, donor_idx in zip(new_transconjugant_indices_newtypeasdonor, new_transconjugants_newtypeasdonor.transfer_donor_indices):
                 self.type_set.transconjugant_indices_bydonor[donor_idx].append(xconj_idx)
             for xconj_idx, recip_idx in zip(new_transconjugant_indices_newtypeasdonor, new_transconjugants_newtypeasdonor.transfer_recip_indices):
                 self.type_set.transconjugant_indices_byrecip[recip_idx].append(xconj_idx)
             # - - - -
             new_transconjugants_newtypeasrecip = self.type_set.generate_transconjugant_set(recip_index=new_type_idx, update_transconjugant_indices=False)
-            new_transconjugant_indices_newtypeasrecip = self.transconjugant_set.add_type(new_transconjugants_newtypeasrecip)
+            new_transconjugant_indices_newtypeasrecip = self.transconjugant_set.add_type(new_transconjugants_newtypeasrecip, keep_lineage_ids=keep_lineage_ids)
             for xconj_idx, donor_idx in zip(new_transconjugant_indices_newtypeasrecip, new_transconjugants_newtypeasrecip.transfer_donor_indices):
                 self.type_set.transconjugant_indices_bydonor[donor_idx].append(xconj_idx)
             for xconj_idx, recip_idx in zip(new_transconjugant_indices_newtypeasrecip, new_transconjugants_newtypeasrecip.transfer_recip_indices):
@@ -802,15 +819,15 @@ class Community():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_extant_type_set(self, type_set=None, t=None, t_index=None):
+    def get_extant_type_set(self, type_set=None, t=None, t_index=None, keep_progenitor_indices=True, keep_lineage_ids=False):
         t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
         type_set = self.type_set if type_set is None else type_set
         #----------------------------------
         if(t_idx == -1):
-            return type_set.get_type(self.extant_type_indices)
+            return type_set.get_type(self.extant_type_indices, keep_progenitor_indices=keep_progenitor_indices, keep_lineage_ids=keep_lineage_ids)
         else:
             _extant_type_indices = np.where(self.N_series[:, t_idx] > 0)[0]
-            return type_set.get_type(_extant_type_indices)
+            return type_set.get_type(_extant_type_indices, keep_progenitor_indices=keep_progenitor_indices, keep_lineage_ids=keep_lineage_ids)
 
     def get_extant_type_indices(self, t=None, t_index=None):
         t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
@@ -819,215 +836,251 @@ class Community():
 
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
-
-
-
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    # TODO: Functions below this point have not been reviewed/revised for PORTAL-driven implementation changes, may not work.
-    #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    def combine(self, added_system, merge_on_type_id=True):
-        # This implementation assumes that the 'self' system that is combined 'into' keeps its thresholds and other metadata attributes.
-        # TODO: Properly combine resource sets (right now the 'self' system resources are kept as is)
+    def sample(self, fraction, random_sampling=True, sample_types=True, sample_resources=True, keep_lineage_ids=True, remove_sample=False):
+        if(not sample_types and not sample_resources):
+            utils.error("Error in ConsumerResourceSystem sample(): One of sample_types or sample_resources must be True.")
+            # TODO: Make it generally possible to create empty Community objects
         #----------------------------------
-        # TODO: At the moment, it seems that there is no good way to reconcile parent indices and phylogenies/lineage ids from multiple systems,
-        # so these are currently being reset in the combined system.
-        self.type_set._parent_indices = [None for i in range(self.num_types)]
-        self.type_set._lineageIDs = None
+        extant_N  = self.N[self.get_extant_type_indices()]
+        sampled_N = np.zeros_like(extant_N)
+        sampled_typeset = None
+        if(sample_types):
+            sampled_typeset = self.get_extant_type_set(keep_progenitor_indices=False, keep_lineage_ids=keep_lineage_ids)
+            sampled_N       = np.random.binomial(n=[int(n) for n in extant_N], p=fraction) if random_sampling else copy.deepcopy(extant_N)
         #----------------------------------
-        for comb_type_idx in range(added_system.type_set.num_types):
-            # Retrieve the added type and some of its properties:
-            comb_type = added_system.type_set.get_type(comb_type_idx)
-            comb_type_id = added_system.type_set.get_type_id(comb_type_idx)
-            comb_type_abundance = added_system.N[comb_type_idx]
-            #----------------------------------
-            if(merge_on_type_id and comb_type_id in self.type_set.typeIDs):
-                # The added type is a pre-existing type in the current population; get its index:
-                preexisting_type_idx = np.where(np.array(self.type_set.typeIDs) == comb_type_id)[0][0]
-                # Add abundance equal to the added types abundance:
-                self.set_type_abundance(type_index=preexisting_type_idx,
-                                        abundance=self.get_type_abundance(preexisting_type_idx) + comb_type_abundance)
-            else:
-                # The added type is not present in the current population:
-                # Add the new type to the population at its abundance in the added_system:
-                self.add_type(comb_type, abundance=comb_type_abundance)#, parent_index=None)  # note that parent_index is None here under assumption that parent indices need to be reset in combined systems
-            #----------------------------------
+        sampled_R = np.zeros_like(self.R)
+        sampled_resourceset = None
+        if(sample_resources):
+            sampled_resourceset = copy.deepcopy(self.resource_set)
+            sampled_R = copy.deepcopy(self.R)
+        #----------------------------------
+        sample = Community(type_set=sampled_typeset, N_init=sampled_N,
+                           resource_set=sampled_resourceset, R_init=sampled_R,
+                           resource_dynamics_mode      = self.resource_dynamics_mode,
+                           threshold_min_abs_abundance = self.threshold_min_abs_abundance,
+                           convergent_lineages         = self.convergent_lineages,
+                           seed                        = self.seed)
+        #----------------------------------
+        # TODO: implement option to remove the sampled contents from this community object
+        #----------------------------------
+        return sample
+
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    def inoculate(self, added_community, keep_lineage_ids=True):
+        self.add_type(added_community.type_set, abundance=added_community.N, keep_lineage_ids=keep_lineage_ids)
+        self.R_series[:,-1] += added_community.R
         return self
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def perturb(self, param, dist, args, mode='multiplicative_proportional', element_wise=True):
-        params = utils.treat_as_list(param)
-        #----------------------------------
-        for param in params:
-            if(param == 'consumption_rate'):
-                perturb_vals = utils.get_perturbations(self.type_set.consumption_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.consumption_rate = (self.type_set.consumption_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.consumption_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.consumption_rate + perturb_vals) if mode == 'additive' else self.type_set.consumption_rate
-            elif(param == 'carrying_capacity'):
-                perturb_vals = utils.get_perturbations(self.type_set.carrying_capacity, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.carrying_capacity = (self.type_set.carrying_capacity * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.carrying_capacity * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.carrying_capacity + perturb_vals) if mode == 'additive' else self.type_set.carrying_capacity
-            elif(param == 'energy_passthru'):
-                perturb_vals = utils.get_perturbations(self.type_set.energy_passthru, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.energy_passthru = (self.type_set.energy_passthru * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.energy_passthru * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.energy_passthru + perturb_vals) if mode == 'additive' else self.type_set.energy_passthru
-            elif(param == 'growth_factor'):
-                perturb_vals = utils.get_perturbations(self.type_set.growth_factor, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.growth_factor = (self.type_set.growth_factor * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.growth_factor * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.growth_factor + perturb_vals) if mode == 'additive' else self.type_set.growth_factor
-            elif(param == 'cost_baseline'):
-                perturb_vals = utils.get_perturbations(self.type_set.cost_baseline, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.cost_baseline = (self.type_set.cost_baseline * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_baseline * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_baseline + perturb_vals) if mode == 'additive' else self.type_set.cost_baseline
-            elif(param == 'cost_trait'):
-                perturb_vals = utils.get_perturbations(self.type_set.cost_trait, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.cost_trait = (self.type_set.cost_trait * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_trait * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_trait + perturb_vals) if mode == 'additive' else self.type_set.cost_trait
-            elif(param == 'mutation_rate'):
-                perturb_vals = utils.get_perturbations(self.type_set.mutation_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.type_set.mutation_rate = (self.type_set.mutation_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.mutation_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.mutation_rate + perturb_vals) if mode == 'additive' else self.type_set.mutation_rate
-            elif(param == 'influx_rate'):
-                perturb_vals = utils.get_perturbations(self.resource_set.influx_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.resource_set.influx_rate = (self.resource_set.influx_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.influx_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.influx_rate + perturb_vals) if mode == 'additive' else self.resource_set.influx_rate
-            elif(param == 'decay_rate'):
-                perturb_vals = utils.get_perturbations(self.resource_set.decay_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.resource_set.decay_rate = (self.resource_set.decay_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.decay_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.decay_rate + perturb_vals) if mode == 'additive' else self.resource_set.decay_rate
-            elif(param == 'energy_content'):
-                perturb_vals = utils.get_perturbations(self.resource_set.energy_content, dist=dist, args=args, mode=mode, element_wise=element_wise)
-                self.resource_set.energy_content = (self.resource_set.energy_content * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.energy_content * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.energy_content + perturb_vals) if mode == 'additive' else self.resource_set.energy_content
-        #----------------------------------
-        return self
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def get_most_fit_types(self, rank_cutoff=None, fitness_cutoff=None, t=None, t_index=None):
-        rank_cutoff = 1 if rank_cutoff is None else rank_cutoff
-        fitness_cutoff = np.min(self.fitness) if fitness_cutoff is None else fitness_cutoff
-        t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
-        #----------------------------------
-        return self.type_set.get_type(self.get_fitness(t_index=t_idx)[self.get_fitness(t_index=t_idx) >= fitness_cutoff].argsort()[::-1][:rank_cutoff])
 
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_lowest_cost_types(self, rank_cutoff=None, cost_cutoff=None):
-        rank_cutoff = 1 if rank_cutoff is None else rank_cutoff
-        cost_cutoff = np.max(self.type_set.energy_costs) if cost_cutoff is None else cost_cutoff
-        #----------------------------------
-        return self.type_set.get_type(self.type_set.energy_costs[self.type_set.energy_costs <= cost_cutoff].argsort()[:rank_cutoff])
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    @staticmethod
-    def resource_demand(N, traits):
-        return np.einsum(('ij,ij->j' if N.ndim == 2 else 'i,ij->j'), N, traits)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_resource_demand(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None, relative_demand=False):
-        type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
-        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
-        #----------------------------------
-        abundances = self.get_type_abundance(type_index=type_indices, t_index=time_indices)
-        #----------------------------------
-        resource_demand = np.einsum(('ij,jk->ik' if abundances.ndim == 2 else 'i,ij->j'), abundances.T, self.type_set.traits[type_indices, :][:, trait_subset])
-        if(relative_demand):
-            resource_demand /= resource_demand.sum()
-        #----------------------------------
-        return (resource_demand.T)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_biomass(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
-        type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
-        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
-        #----------------------------------
-        resource_demand = self.get_resource_demand(type_index=type_indices, t_index=time_indices, trait_subset=trait_subset)
-        #----------------------------------
-        biomass = resource_demand.sum(axis=0)
-        #----------------------------------
-        return (biomass)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_num_extant_types(self, type_index=None, type_id=None, t=None, t_index=None):
-        type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
-        #----------------------------------
-        abundances = self.get_type_abundance(type_index=type_indices, t_index=time_indices)
-        #----------------------------------
-        num_extant_types = np.count_nonzero(abundances, axis=0)
-        #----------------------------------
-        return num_extant_types
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_num_extant_phenotypes(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
-        type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
-        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
-        #----------------------------------
-        numphenos_by_time = []
-        for tidx in time_indices:
-            extant_type_indices = self.get_extant_type_indices(t_index=tidx)
-            extant_type_indices_of_interest = list(set(extant_type_indices).intersection(set(type_indices)))
-            traits_subset = self.type_set.traits[extant_type_indices_of_interest, :][:, trait_subset]
-            num_phenotypes = np.unique(traits_subset, axis=0).shape[0]
-            numphenos_by_time.append(num_phenotypes)
-        #----------------------------------
-        return np.array(numphenos_by_time)
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    def get_num_traits_per_type(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None, summary_stat=None):
-        type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
-        time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
-        trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
-        #----------------------------------
-        if(isinstance(time_indices, (list, np.ndarray))):
-            numtraits_by_time = []
-            for tidx in time_indices:
-                extant_type_indices = self.get_extant_type_indices(t_index=tidx)
-                extant_type_indices_of_interest = list(set(extant_type_indices).intersection(set(type_indices)))
-                traits_subset = self.type_set.traits[extant_type_indices_of_interest, :][:, trait_subset]
-                num_traits = np.count_nonzero(traits_subset, axis=1)
-                if(summary_stat == 'mean' or summary_stat == 'average'):
-                    numtraits_by_time.append(np.mean(num_traits))
-                elif(summary_stat == 'median'):
-                    numtraits_by_time.append(np.median(num_traits))
-                elif(summary_stat == 'min'):
-                    numtraits_by_time.append(np.min(num_traits))
-                elif(summary_stat == 'max'):
-                    numtraits_by_time.append(np.max(num_traits))
-                elif(summary_stat == 'std' or summary_stat == 'stdev'):
-                    numtraits_by_time.append(np.std(num_traits))
-                else:
-                    numtraits_by_time.append(num_traits)
-            return np.array(numtraits_by_time)
-        else:
-            extant_type_indices = self.get_extant_type_indices(t_index=time_indices)
-            extant_type_indices_of_interest = list(set(extant_type_indices).intersection(set(type_indices)))
-            traits_subset = self.type_set.traits[extant_type_indices_of_interest, :][:, trait_subset]
-            num_traits = np.count_nonzero(traits_subset, axis=1)
-            if(summary_stat == 'mean' or summary_stat == 'average'):
-                return np.mean(num_traits)
-            elif(summary_stat == 'median'):
-                return np.median(num_traits)
-            elif(summary_stat == 'min'):
-                return np.min(num_traits)
-            elif(summary_stat == 'max'):
-                return np.max(num_traits)
-            elif(summary_stat == 'std' or summary_stat == 'stdev'):
-                return np.std(num_traits)
-            else:
-                return num_traits
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    # def get_optima(self, traits_sample, t=None, t_index=None, N_eval=None, R_eval=None): #include_
+    # #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    # # TODO: Functions below this point have not been reviewed/revised for PORTAL-driven implementation changes, may not work.
+    # #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    #
+    # def combine(self, added_system, merge_on_type_id=True):
+    #     # This implementation assumes that the 'self' system that is combined 'into' keeps its thresholds and other metadata attributes.
+    #     # TODO: Properly combine resource sets (right now the 'self' system resources are kept as is)
+    #     #----------------------------------
+    #     # TODO: At the moment, it seems that there is no good way to reconcile parent indices and phylogenies/lineage ids from multiple systems,
+    #     # so these are currently being reset in the combined system.
+    #     self.type_set._parent_indices = [None for i in range(self.num_types)]
+    #     self.type_set._lineageIDs = None
+    #     #----------------------------------
+    #     for comb_type_idx in range(added_system.type_set.num_types):
+    #         # Retrieve the added type and some of its properties:
+    #         comb_type = added_system.type_set.get_type(comb_type_idx)
+    #         comb_type_id = added_system.type_set.get_type_id(comb_type_idx)
+    #         comb_type_abundance = added_system.N[comb_type_idx]
+    #         #----------------------------------
+    #         if(merge_on_type_id and comb_type_id in self.type_set.typeIDs):
+    #             # The added type is a pre-existing type in the current population; get its index:
+    #             preexisting_type_idx = np.where(np.array(self.type_set.typeIDs) == comb_type_id)[0][0]
+    #             # Add abundance equal to the added types abundance:
+    #             self.set_type_abundance(type_index=preexisting_type_idx,
+    #                                     abundance=self.get_type_abundance(preexisting_type_idx) + comb_type_abundance)
+    #         else:
+    #             # The added type is not present in the current population:
+    #             # Add the new type to the population at its abundance in the added_system:
+    #             self.add_type(comb_type, abundance=comb_type_abundance)#, parent_index=None)  # note that parent_index is None here under assumption that parent indices need to be reset in combined systems
+    #         #----------------------------------
+    #     return self
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def perturb(self, param, dist, args, mode='multiplicative_proportional', element_wise=True):
+    #     params = utils.treat_as_list(param)
+    #     #----------------------------------
+    #     for param in params:
+    #         if(param == 'consumption_rate'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.consumption_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.consumption_rate = (self.type_set.consumption_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.consumption_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.consumption_rate + perturb_vals) if mode == 'additive' else self.type_set.consumption_rate
+    #         elif(param == 'carrying_capacity'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.carrying_capacity, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.carrying_capacity = (self.type_set.carrying_capacity * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.carrying_capacity * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.carrying_capacity + perturb_vals) if mode == 'additive' else self.type_set.carrying_capacity
+    #         elif(param == 'energy_passthru'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.energy_passthru, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.energy_passthru = (self.type_set.energy_passthru * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.energy_passthru * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.energy_passthru + perturb_vals) if mode == 'additive' else self.type_set.energy_passthru
+    #         elif(param == 'growth_factor'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.growth_factor, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.growth_factor = (self.type_set.growth_factor * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.growth_factor * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.growth_factor + perturb_vals) if mode == 'additive' else self.type_set.growth_factor
+    #         elif(param == 'cost_baseline'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.cost_baseline, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.cost_baseline = (self.type_set.cost_baseline * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_baseline * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_baseline + perturb_vals) if mode == 'additive' else self.type_set.cost_baseline
+    #         elif(param == 'cost_trait'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.cost_trait, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.cost_trait = (self.type_set.cost_trait * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_trait * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_trait + perturb_vals) if mode == 'additive' else self.type_set.cost_trait
+    #         elif(param == 'mutation_rate'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.mutation_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.mutation_rate = (self.type_set.mutation_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.mutation_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.mutation_rate + perturb_vals) if mode == 'additive' else self.type_set.mutation_rate
+    #         elif(param == 'influx_rate'):
+    #             perturb_vals = utils.get_perturbations(self.resource_set.influx_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.resource_set.influx_rate = (self.resource_set.influx_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.influx_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.influx_rate + perturb_vals) if mode == 'additive' else self.resource_set.influx_rate
+    #         elif(param == 'decay_rate'):
+    #             perturb_vals = utils.get_perturbations(self.resource_set.decay_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.resource_set.decay_rate = (self.resource_set.decay_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.decay_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.decay_rate + perturb_vals) if mode == 'additive' else self.resource_set.decay_rate
+    #         elif(param == 'energy_content'):
+    #             perturb_vals = utils.get_perturbations(self.resource_set.energy_content, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.resource_set.energy_content = (self.resource_set.energy_content * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.resource_set.energy_content * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.resource_set.energy_content + perturb_vals) if mode == 'additive' else self.resource_set.energy_content
+    #     #----------------------------------
+    #     return self
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def get_most_fit_types(self, rank_cutoff=None, fitness_cutoff=None, t=None, t_index=None):
+    #     rank_cutoff = 1 if rank_cutoff is None else rank_cutoff
+    #     fitness_cutoff = np.min(self.fitness) if fitness_cutoff is None else fitness_cutoff
     #     t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
     #     #----------------------------------
+    #     return self.type_set.get_type(self.get_fitness(t_index=t_idx)[self.get_fitness(t_index=t_idx) >= fitness_cutoff].argsort()[::-1][:rank_cutoff])
     #
-    #     eval_system = copy.deepcopy(self)
-    #     eval_system.add_type(new_type_set=traits_sample, abundance=0)
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     #
-    #     # print(self.traits, self.traits.shape)
-    #     # print(self.N, self.N.shape)
-    #     # print(self.energy_cost, self.energy_cost.shape)
+    # def get_lowest_cost_types(self, rank_cutoff=None, cost_cutoff=None):
+    #     rank_cutoff = 1 if rank_cutoff is None else rank_cutoff
+    #     cost_cutoff = np.max(self.type_set.energy_costs) if cost_cutoff is None else cost_cutoff
+    #     #----------------------------------
+    #     return self.type_set.get_type(self.type_set.energy_costs[self.type_set.energy_costs <= cost_cutoff].argsort()[:rank_cutoff])
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # @staticmethod
+    # def resource_demand(N, traits):
+    #     return np.einsum(('ij,ij->j' if N.ndim == 2 else 'i,ij->j'), N, traits)
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def get_resource_demand(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None, relative_demand=False):
+    #     type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+    #     time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+    #     trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+    #     #----------------------------------
+    #     abundances = self.get_type_abundance(type_index=type_indices, t_index=time_indices)
+    #     #----------------------------------
+    #     resource_demand = np.einsum(('ij,jk->ik' if abundances.ndim == 2 else 'i,ij->j'), abundances.T, self.type_set.traits[type_indices, :][:, trait_subset])
+    #     if(relative_demand):
+    #         resource_demand /= resource_demand.sum()
+    #     #----------------------------------
+    #     return (resource_demand.T)
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def get_biomass(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
+    #     type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+    #     time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+    #     trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+    #     #----------------------------------
+    #     resource_demand = self.get_resource_demand(type_index=type_indices, t_index=time_indices, trait_subset=trait_subset)
+    #     #----------------------------------
+    #     biomass = resource_demand.sum(axis=0)
+    #     #----------------------------------
+    #     return (biomass)
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def get_num_extant_types(self, type_index=None, type_id=None, t=None, t_index=None):
+    #     type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+    #     time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+    #     #----------------------------------
+    #     abundances = self.get_type_abundance(type_index=type_indices, t_index=time_indices)
+    #     #----------------------------------
+    #     num_extant_types = np.count_nonzero(abundances, axis=0)
+    #     #----------------------------------
+    #     return num_extant_types
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def get_num_extant_phenotypes(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None):
+    #     type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+    #     time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+    #     trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+    #     #----------------------------------
+    #     numphenos_by_time = []
+    #     for tidx in time_indices:
+    #         extant_type_indices = self.get_extant_type_indices(t_index=tidx)
+    #         extant_type_indices_of_interest = list(set(extant_type_indices).intersection(set(type_indices)))
+    #         traits_subset = self.type_set.traits[extant_type_indices_of_interest, :][:, trait_subset]
+    #         num_phenotypes = np.unique(traits_subset, axis=0).shape[0]
+    #         numphenos_by_time.append(num_phenotypes)
+    #     #----------------------------------
+    #     return np.array(numphenos_by_time)
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # def get_num_traits_per_type(self, type_index=None, type_id=None, t=None, t_index=None, trait_subset=None, summary_stat=None):
+    #     type_indices = [np.where(np.array(self.type_set.typeIDs) == tid)[0] for tid in utils.treat_as_list(type_id)] if type_id is not None else utils.treat_as_list(type_index) if type_index is not None else list(range(self.type_set.num_types))
+    #     time_indices = [np.argmax(self.t_series >= t_) for t_ in utils.treat_as_list(t)] if t is not None else utils.treat_as_list(t_index) if t_index is not None else -1
+    #     trait_subset = np.array(range(self.type_set.num_traits) if trait_subset is None else trait_subset)
+    #     #----------------------------------
+    #     if(isinstance(time_indices, (list, np.ndarray))):
+    #         numtraits_by_time = []
+    #         for tidx in time_indices:
+    #             extant_type_indices = self.get_extant_type_indices(t_index=tidx)
+    #             extant_type_indices_of_interest = list(set(extant_type_indices).intersection(set(type_indices)))
+    #             traits_subset = self.type_set.traits[extant_type_indices_of_interest, :][:, trait_subset]
+    #             num_traits = np.count_nonzero(traits_subset, axis=1)
+    #             if(summary_stat == 'mean' or summary_stat == 'average'):
+    #                 numtraits_by_time.append(np.mean(num_traits))
+    #             elif(summary_stat == 'median'):
+    #                 numtraits_by_time.append(np.median(num_traits))
+    #             elif(summary_stat == 'min'):
+    #                 numtraits_by_time.append(np.min(num_traits))
+    #             elif(summary_stat == 'max'):
+    #                 numtraits_by_time.append(np.max(num_traits))
+    #             elif(summary_stat == 'std' or summary_stat == 'stdev'):
+    #                 numtraits_by_time.append(np.std(num_traits))
+    #             else:
+    #                 numtraits_by_time.append(num_traits)
+    #         return np.array(numtraits_by_time)
+    #     else:
+    #         extant_type_indices = self.get_extant_type_indices(t_index=time_indices)
+    #         extant_type_indices_of_interest = list(set(extant_type_indices).intersection(set(type_indices)))
+    #         traits_subset = self.type_set.traits[extant_type_indices_of_interest, :][:, trait_subset]
+    #         num_traits = np.count_nonzero(traits_subset, axis=1)
+    #         if(summary_stat == 'mean' or summary_stat == 'average'):
+    #             return np.mean(num_traits)
+    #         elif(summary_stat == 'median'):
+    #             return np.median(num_traits)
+    #         elif(summary_stat == 'min'):
+    #             return np.min(num_traits)
+    #         elif(summary_stat == 'max'):
+    #             return np.max(num_traits)
+    #         elif(summary_stat == 'std' or summary_stat == 'stdev'):
+    #             return np.std(num_traits)
+    #         else:
+    #             return num_traits
+    #
+    # #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    #
+    # # def get_optima(self, traits_sample, t=None, t_index=None, N_eval=None, R_eval=None): #include_
+    # #     t_idx = np.argmax(self.t_series >= t) if t is not None else t_index if t_index is not None else -1
+    # #     #----------------------------------
+    # #
+    # #     eval_system = copy.deepcopy(self)
+    # #     eval_system.add_type(new_type_set=traits_sample, abundance=0)
+    # #
+    # #     # print(self.traits, self.traits.shape)
+    # #     # print(self.N, self.N.shape)
+    # #     # print(self.energy_cost, self.energy_cost.shape)
