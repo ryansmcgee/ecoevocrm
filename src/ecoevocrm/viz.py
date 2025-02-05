@@ -16,7 +16,9 @@ def matrix_plot(mat, ax=None, cmap=None, vmin=None, vmax=None, center=None, cbar
     mat = np.atleast_2d(mat)
 
     if(cmap is None):
-        if(np.any(mat < 0)):
+        if(np.all(np.isin(mat, [0, 1])) or np.all(np.isin(mat, [-1, 1]))):
+            cmap = 'Greys'
+        elif(np.any(mat < 0)):
             cmap   = 'RdBu'
             center = 0 if center == None else center
             vmin   = -1*np.max(np.abs(mat)) if vmin == None else vmin
