@@ -188,7 +188,38 @@ class TypeSet():
 
     @property
     def cost_landscape_bytype(self):
-        return [self._cost_landscape[k] for k in self.trait_keys] if self._cost_landscape is not None else 0
+        if self._cost_landscape is not None:
+            if not hasattr(self, "landscape_patterns"):
+                self.landscape_patterns = []
+                for trait_pattern, landscape_value in self._cost_landscape.items():
+                    bitmask = 0
+                    target_bits = 0
+                    for character in trait_pattern:
+                        bitmask = (bitmask << 1) | (0 if character == '*' else 1)
+                        target_bits = (target_bits << 1) | (1 if character == '1' else 0)
+                    pattern_length = len(trait_pattern)
+                    self.landscape_patterns.append((bitmask, target_bits, float(landscape_value), pattern_length))
+
+            l = []
+            for trait_key in self.trait_keys:
+                trait_length = len(trait_key)
+                trait_int = None
+                matched_value = 0.0
+                for bitmask, target_bits, value, pattern_length in self.landscape_patterns:
+                    if pattern_length != trait_length:
+                        continue
+                    if trait_int is None:
+                        trait_int = int(trait_key, 2)
+                    if (trait_int & bitmask) == target_bits:
+                        matched_value = value
+                        # print("-->", bitmask, "matched value = value", matched_value, "=", value)
+                        break
+                l.append(matched_value)
+#             print("return", l)
+            return l
+        else:
+#             print("return", 0)
+            return 0
 
     @property
     def mutation_rate(self):
