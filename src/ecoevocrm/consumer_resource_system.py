@@ -38,7 +38,8 @@ class Community():
                  growth_factor               = 1,     # w      | previously gamma
                  energy_passthru             = 0,     # p      | previously lamda
                  cost_baseline               = 0,     # xi     | previously xi
-                 cost_trait                  = 0,     # theta  | previously chi
+                 cost_pertrait               = 0,     # theta  | previously chi
+                 cost_perpair                = 0,
                  cost_interaction            = None,  # J      | previously J
                  cost_landscape              = None,  # lambda
                  mutation_rate               = 1e-9,  # m      | previously mu
@@ -111,7 +112,7 @@ class Community():
         else:
             self.type_set = TypeSet(num_types=system_num_types, num_traits=system_num_resources, traits=traits,
                                     consumption_rate=consumption_rate, carrying_capacity=carrying_capacity, energy_passthru=energy_passthru, growth_factor=growth_factor,
-                                    cost_baseline=cost_baseline, cost_trait=cost_trait, cost_interaction=cost_interaction, cost_landscape=cost_landscape,
+                                    cost_baseline=cost_baseline, cost_pertrait=cost_pertrait, cost_perpair=cost_perpair, cost_interaction=cost_interaction, cost_landscape=cost_landscape,
                                     mutation_rate=mutation_rate, segregation_rate=segregation_rate, transfer_rate_donor=transfer_rate_donor, transfer_rate_recip=transfer_rate_recip,
                                     mutant_overrides=mutant_overrides, segregant_overrides=segregant_overrides, transconjugant_overrides=transconjugant_overrides,
                                     segregation_linkage=segregation_linkage, transfer_linkage=transfer_linkage, lineageIDs=lineageIDs, lineageID_traits=lineageID_traits)
@@ -929,9 +930,9 @@ class Community():
     #         elif(param == 'cost_baseline'):
     #             perturb_vals = utils.get_perturbations(self.type_set.cost_baseline, dist=dist, args=args, mode=mode, element_wise=element_wise)
     #             self.type_set.cost_baseline = (self.type_set.cost_baseline * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_baseline * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_baseline + perturb_vals) if mode == 'additive' else self.type_set.cost_baseline
-    #         elif(param == 'cost_trait'):
-    #             perturb_vals = utils.get_perturbations(self.type_set.cost_trait, dist=dist, args=args, mode=mode, element_wise=element_wise)
-    #             self.type_set.cost_trait = (self.type_set.cost_trait * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_trait * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_trait + perturb_vals) if mode == 'additive' else self.type_set.cost_trait
+    #         elif(param == 'cost_pertrait'):
+    #             perturb_vals = utils.get_perturbations(self.type_set.cost_pertrait, dist=dist, args=args, mode=mode, element_wise=element_wise)
+    #             self.type_set.cost_pertrait = (self.type_set.cost_pertrait * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.cost_pertrait * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.cost_pertrait + perturb_vals) if mode == 'additive' else self.type_set.cost_pertrait
     #         elif(param == 'mutation_rate'):
     #             perturb_vals = utils.get_perturbations(self.type_set.mutation_rate, dist=dist, args=args, mode=mode, element_wise=element_wise)
     #             self.type_set.mutation_rate = (self.type_set.mutation_rate * (1 + np.maximum(perturb_vals, -1))) if mode == 'multiplicative_proportional' else (self.type_set.mutation_rate * np.maximum(perturb_vals, 0)) if mode == 'multiplicative' else (self.type_set.mutation_rate + perturb_vals) if mode == 'additive' else self.type_set.mutation_rate
