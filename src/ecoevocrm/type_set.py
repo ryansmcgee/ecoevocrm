@@ -159,6 +159,9 @@ class TypeSet():
     def cost_landscape(self):
         return TypeSet.get_array(self._cost_landscape)
 
+    def update_cost_landscape(self, new_landscape_dict):
+        self._cost_landscape.update(new_landscape_dict)
+
     @property
     def energy_costs(self):
         if(self._energy_costs is None):

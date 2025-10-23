@@ -188,7 +188,7 @@ def abundance_plot(community, ax=None, type_colors=None, type_hatches=None, rela
                    color_step_min=0.01, color_step_max=0.5, color_step_scale=1, color_step_dir='random', seed=None,
                    linewidth=None, edgecolor=None):
 
-    if(type_colors is None or type_hatches is None):
+    if(type_colors is None):# or type_hatches is None):
         _type_colors, _type_hatches = type_styles_by_phylogeny(community.type_set, base_color=base_color, clade_colors=clade_colors, color_tags=color_tags, hatch_tags=hatch_tags, vmin=vmin, vmax=vmax,
                                                palette=palette, palette_depth=palette_depth, shuffle_palette=shuffle_palette, seed=seed,
                                                color_step_min=color_step_min, color_step_max=color_step_max, color_step_scale=color_step_scale, color_step_dir=color_step_dir)
