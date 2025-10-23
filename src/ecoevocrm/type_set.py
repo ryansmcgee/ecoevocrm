@@ -16,7 +16,8 @@ class TypeSet():
                        growth_factor              = 1,      # w      | previously gamma
                        energy_passthru            = 0,      # p      | previously lamda
                        cost_baseline              = 0,      # xi     | previously xi
-                       cost_trait                 = 0,      # theta  | previously chi
+                       cost_pertrait              = 0,      # theta  | previously chi
+                       cost_perpair               = 0,
                        mutation_rate              = 1e-9,   # m      | previously mu
                        segregation_rate           = 0,      # l
                        transfer_rate_donor        = 0,      # beta
@@ -68,7 +69,8 @@ class TypeSet():
             'energy_passthru':     energy_passthru if isinstance(energy_passthru, utils.SystemParameter) else utils.SystemParameter(values=energy_passthru, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
             'growth_factor':       growth_factor if isinstance(growth_factor, utils.SystemParameter) else utils.SystemParameter(values=growth_factor, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
             'cost_baseline':       cost_baseline if isinstance(cost_baseline, utils.SystemParameter) else utils.SystemParameter(values=cost_baseline, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
-            'cost_trait':          cost_trait if (cost_trait is None or isinstance(cost_trait, utils.SystemParameter)) else utils.SystemParameter(values=cost_trait, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
+            'cost_pertrait':       cost_pertrait if (cost_pertrait is None or isinstance(cost_pertrait, utils.SystemParameter)) else utils.SystemParameter(values=cost_pertrait, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
+            'cost_perpair':        cost_perpair if isinstance(cost_perpair, utils.SystemParameter) else utils.SystemParameter(values=cost_perpair, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=False),
             'mutation_rate':       mutation_rate if isinstance(mutation_rate, utils.SystemParameter) else utils.SystemParameter(values=mutation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
             'segregation_rate':    segregation_rate if isinstance(segregation_rate, utils.SystemParameter) else utils.SystemParameter(values=segregation_rate, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
             'transfer_rate_donor': transfer_rate_donor if isinstance(transfer_rate_donor, utils.SystemParameter) else utils.SystemParameter(values=transfer_rate_donor, num_types=self.num_types, num_traits=self.num_traits, force_type_dim=False, force_trait_dim=True),
@@ -148,8 +150,12 @@ class TypeSet():
         return self._params['cost_baseline'].values()
 
     @property
-    def cost_trait(self):
-        return self._params['cost_trait'].values()
+    def cost_pertrait(self):
+        return self._params['cost_pertrait'].values()
+
+    @property
+    def cost_perpair(self):
+        return self._params['cost_perpair'].values()
 
     @property
     def cost_interaction(self):
@@ -167,7 +173,8 @@ class TypeSet():
         if(self._energy_costs is None):
             costs = 0
             costs += self.cost_baseline_bytype
-            costs += self.cost_trait_bytype
+            costs += self.cost_pertrait_bytype
+            costs += self.cost_perpair_bytype
             costs += self.cost_interaction_bytype
             costs += self.cost_landscape_bytype
             if(np.any(costs < 0)):
@@ -180,9 +187,16 @@ class TypeSet():
         return self._params['cost_baseline'].values()
 
     @property
-    def cost_trait_bytype(self):
+    def cost_pertrait_bytype(self):
         _traits = self.traits if not self.binarize_trait_costs else (self.traits > 0).astype(int)
-        return np.sum(_traits * self.cost_trait, axis=1) if self._params['cost_trait'] is not None else 0
+        return np.sum(_traits * self.cost_pertrait, axis=1) if self._params['cost_pertrait'] is not None else 0
+
+    @property
+    def cost_perpair_bytype(self):
+        # Use binarized traits if requested (mirrors cost_trait_bytype behavior)
+        _traits = self.traits if not self.binarize_trait_costs else (self.traits > 0).astype(int)
+        n = _traits.sum(axis=1)
+        return 0.5 * self.cost_perpair * n * (n - 1)   # α * C(n,2)
     
     @property
     def cost_interaction_bytype(self):
@@ -351,7 +365,7 @@ class TypeSet():
                 mutant_indices[p].append(len(traits_mut)-1)
         #----------------------------------
         mutant_set = TypeSet(traits=traits_mut, consumption_rate=params_mut['consumption_rate'], carrying_capacity=params_mut['carrying_capacity'], energy_passthru=params_mut['energy_passthru'], growth_factor=params_mut['growth_factor'],
-                             cost_baseline=params_mut['cost_baseline'], cost_trait=params_mut['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
+                             cost_baseline=params_mut['cost_baseline'], cost_pertrait=params_mut['cost_pertrait'], cost_perpair=params_mut['cost_perpair'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
                              mutation_rate=params_mut['mutation_rate'], segregation_rate=params_mut['segregation_rate'], transfer_rate_donor=params_mut['transfer_rate_donor'], transfer_rate_recip=params_mut['transfer_rate_recip'],
                              mutant_overrides=self.mutant_overrides, segregant_overrides=self.segregant_overrides, transconjugant_overrides=self.transconjugant_overrides,
                              creation_rate=creation_rate_mut, mutation_parent_indices=parent_indices_mut, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
@@ -410,7 +424,7 @@ class TypeSet():
                     segregant_indices[p].append(len(traits_seg)-1)
         #----------------------------------
         segregant_set = TypeSet(traits=traits_seg, consumption_rate=params_seg['consumption_rate'], carrying_capacity=params_seg['carrying_capacity'], energy_passthru=params_seg['energy_passthru'], growth_factor=params_seg['growth_factor'],
-                                cost_baseline=params_seg['cost_baseline'], cost_trait=params_seg['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
+                                cost_baseline=params_seg['cost_baseline'], cost_pertrait=params_seg['cost_pertrait'], cost_perpair=params_seg['cost_perpair'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
                                 mutation_rate=params_seg['mutation_rate'], segregation_rate=params_seg['segregation_rate'], transfer_rate_donor=params_seg['transfer_rate_donor'], transfer_rate_recip=params_seg['transfer_rate_recip'],
                                 mutant_overrides=self.mutant_overrides, segregant_overrides=self.segregant_overrides, transconjugant_overrides=self.transconjugant_overrides,
                                 creation_rate=creation_rate_seg, segregation_parent_indices=parent_indices_seg, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
@@ -490,7 +504,7 @@ class TypeSet():
                             transconjugant_indices_byrecip[r].append(len(traits_xconj)-1)
         #----------------------------------
         transconjugant_set = TypeSet(traits=traits_xconj, consumption_rate=params_xconj['consumption_rate'], carrying_capacity=params_xconj['carrying_capacity'], energy_passthru=params_xconj['energy_passthru'], growth_factor=params_xconj['growth_factor'],
-                                     cost_baseline=params_xconj['cost_baseline'], cost_trait=params_xconj['cost_trait'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
+                                     cost_baseline=params_xconj['cost_baseline'], cost_pertrait=params_xconj['cost_pertrait'], cost_perpair=params_xconj['cost_perpair'], cost_interaction=self.cost_interaction, cost_landscape=self.cost_landscape,
                                      mutation_rate=params_xconj['mutation_rate'], segregation_rate=params_xconj['segregation_rate'], transfer_rate_donor=params_xconj['transfer_rate_donor'], transfer_rate_recip=params_xconj['transfer_rate_recip'],
                                      mutant_overrides=self.mutant_overrides, segregant_overrides=self.segregant_overrides, transconjugant_overrides=self.transconjugant_overrides,
                                      creation_rate=creation_rate_xconj, transfer_donor_indices=donor_indices_xconj, transfer_recip_indices=recip_indices_xconj, binarize_trait_costs=self.binarize_trait_costs, binarize_interaction_costs=self.binarize_interaction_costs)
@@ -634,7 +648,8 @@ class TypeSet():
                         energy_passthru            = self._params['energy_passthru'].get_type(type_idx),
                         growth_factor              = self._params['growth_factor'].get_type(type_idx),
                         cost_baseline              = self._params['cost_baseline'].get_type(type_idx),
-                        cost_trait                 = self._params['cost_trait'].get_type(type_idx),
+                        cost_pertrait              = self._params['cost_pertrait'].get_type(type_idx),
+                        cost_perpair               = self._params['cost_perpair'].get_type(type_idx),
                         cost_interaction           = self.cost_interaction,
                         cost_landscape             = self.cost_landscape,
                         mutation_rate              = self._params['mutation_rate'].get_type(type_idx),
